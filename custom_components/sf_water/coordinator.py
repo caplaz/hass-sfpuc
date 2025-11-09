@@ -7,7 +7,11 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from bs4 import BeautifulSoup
-from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
+from homeassistant.components.recorder.models import (
+    StatisticData,
+    StatisticMeanType,
+    StatisticMetaData,
+)
 from homeassistant.components.recorder.statistics import async_add_external_statistics
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
@@ -208,9 +212,11 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             metadata = StatisticMetaData(
                 has_mean=False,
                 has_sum=True,
+                mean_type=StatisticMeanType.NONE,
                 name="SF Water Daily Usage",
                 source=DOMAIN,
                 statistic_id=f"{DOMAIN}:daily_usage",
+                unit_class="volume",
                 unit_of_measurement=UnitOfVolume.GALLONS,
             )
 

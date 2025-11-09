@@ -1,5 +1,7 @@
 # Development requirements for SF Water
 homeassistant>=2023.1.0
+requests>=2.25.1
+beautifulsoup4>=4.9.3
 voluptuous>=0.13.1
 
 # Testing
@@ -15,6 +17,9 @@ flake8>=6.0.0
 mypy>=1.0.0
 bandit>=1.7.0
 pre-commit>=3.0.0
+
+# Type stubs
+types-requests>=2.25.0
 
 # Documentation
 markdown>=3.4.0
