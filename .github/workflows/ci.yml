@@ -99,7 +99,7 @@ jobs:
         run: |
           # Set up Python environment
           python -m pip install --upgrade pip
-          pip install homeassistant==2025.1.4
+          pip install homeassistant==2025.4.0
 
           # Test that the component can be imported
           export PYTHONPATH="${PWD}:${PYTHONPATH}"
@@ -108,14 +108,14 @@ jobs:
           sys.path.insert(0, 'custom_components')
 
           try:
-              from sf_water import DOMAIN
+              from sf_water.const import DOMAIN
               print(f'✅ Component import successful, domain: {DOMAIN}')
 
               from sf_water.config_flow import ConfigFlow
               print('✅ Config flow import successful')
 
-              from sf_water.sensor import SFWaterSensor
-              print('✅ Sensor import successful')
+              from sf_water.coordinator import SFWaterCoordinator
+              print('✅ Coordinator import successful')
 
           except Exception as e:
               print(f'❌ Component import failed: {e}')
@@ -128,7 +128,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.13"]
-        home-assistant-version: ["2025.1.4"]
+        home-assistant-version: ["2025.4.0"]
 
     steps:
       - uses: actions/checkout@v4

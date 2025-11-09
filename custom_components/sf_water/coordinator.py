@@ -10,9 +10,9 @@ from typing import Any
 from bs4 import BeautifulSoup
 from homeassistant.components.recorder.models import (
     StatisticData,
+    StatisticMeanType,
     StatisticMetaData,
 )
-from homeassistant.components.recorder.models.statistics import StatisticMeanType
 from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
 )
