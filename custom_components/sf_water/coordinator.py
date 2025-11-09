@@ -20,7 +20,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 import requests
 
-from .const import CONF_PASSWORD, CONF_UPDATE_INTERVAL, CONF_USERNAME, DOMAIN
+from .const import CONF_PASSWORD, CONF_USERNAME, DEFAULT_UPDATE_INTERVAL, DOMAIN
 
 
 class SFPUCScraper:
@@ -165,9 +165,7 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             logger=hass.data[DOMAIN]["logger"],
             name=DOMAIN,
-            update_interval=timedelta(
-                minutes=config_entry.options.get(CONF_UPDATE_INTERVAL, 60)
-            ),
+            update_interval=timedelta(minutes=DEFAULT_UPDATE_INTERVAL),
         )
         self.config_entry = config_entry
         self.scraper = SFPUCScraper(

@@ -5,10 +5,9 @@ DOMAIN = "sf_water"
 # Configuration options
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"  # nosec B105
-CONF_UPDATE_INTERVAL = "update_interval"
 
 # Default configuration values
-DEFAULT_UPDATE_INTERVAL = 60  # minutes (daily update)
+DEFAULT_UPDATE_INTERVAL = 720  # minutes (12 hours - fixed for daily data)
 
 # Sensor data keys
 KEY_DAILY_USAGE = "daily_usage"

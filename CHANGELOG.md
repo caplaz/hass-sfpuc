@@ -19,6 +19,7 @@
 - **Code Quality**: Comprehensive pre-commit hooks (black, isort, flake8, mypy, bandit, codespell, yamllint)
 - **Modular Architecture**: Clean separation between coordinator, sensor, and configuration components
 - **Type Safety**: Full type annotations and mypy compliance
+- **Update Frequency**: Fixed 12-hour intervals for daily water usage data (following Home Assistant utility integration patterns)
 
 ### Requirements
 

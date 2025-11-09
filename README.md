@@ -65,7 +65,9 @@ This integration enables water usage tracking in Home Assistant's Energy dashboa
 
 ### Update Cycle
 
-- **Frequency**: Configurable (15-1440 minutes, default 60 minutes)
+- **Frequency**: Fixed 12-hour intervals (appropriate for daily water usage data)
+- **Rationale**: SFPUC provides daily water usage data, so frequent updates aren't necessary
+- **Pattern**: Follows Home Assistant utility integration best practices (similar to Opower)
 - **Trigger**: Time-based coordinator updates
 - **Scope**: Fetches current daily usage (historical data via statistics)
 - **Storage**: All data stored locally in Home Assistant database
@@ -128,18 +130,9 @@ HACS (Home Assistant Community Store) is the easiest way to install and manage c
 4. **Configure**:
    - **SFPUC Username**: Your SFPUC account username (typically account number or email)
    - **SFPUC Password**: Your SFPUC portal password
-   - **Update Interval**: How often to fetch data (15-1440 minutes, default 60)
 5. **Submit**: The integration will test your credentials and create the sensor
 
-### Configuration Options
-
-After setup, you can modify settings by:
-
-1. Going to Settings → Devices & Services
-2. Finding "SF Water" in your integrations list
-3. Clicking "Configure" to change the update interval
-
-## Usage
+### Usage
 
 ### Sensors Created
 

@@ -7,13 +7,7 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 import voluptuous as vol
 
-from .const import (
-    CONF_PASSWORD,
-    CONF_UPDATE_INTERVAL,
-    CONF_USERNAME,
-    DEFAULT_UPDATE_INTERVAL,
-    DOMAIN,
-)
+from .const import CONF_PASSWORD, CONF_USERNAME, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,11 +39,6 @@ class SFWaterConfigFlow(config_entries.ConfigFlow):
                             CONF_USERNAME: user_input[CONF_USERNAME],
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },
-                        options={
-                            CONF_UPDATE_INTERVAL: user_input.get(
-                                CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
-                            ),
-                        },
                     )
                 else:
                     errors["base"] = "invalid_auth"
@@ -63,9 +52,6 @@ class SFWaterConfigFlow(config_entries.ConfigFlow):
                 {
                     vol.Required(CONF_USERNAME): str,
                     vol.Required(CONF_PASSWORD): str,
-                    vol.Optional(
-                        CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL
-                    ): vol.All(vol.Coerce(int), vol.Range(min=15, max=1440)),
                 }
             ),
             errors=errors,
@@ -86,19 +72,5 @@ class SFWaterOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_UPDATE_INTERVAL,
-                        default=self.config_entry.options.get(
-                            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=15, max=1440)),
-                }
-            ),
-        )
+        # No configurable options - update interval is fixed for daily data
+        return self.async_create_entry(title="", data={})

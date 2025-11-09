@@ -3,16 +3,14 @@
     "step": {
       "user": {
         "title": "Configuración de Agua de San Francisco",
-        "description": "Conéctate a tu cuenta SFPUC para monitorear el uso de agua.\n\n**Requerido:** Nombre de usuario y contraseña de SFPUC para acceso a la cuenta.\n\n**Proceso de Configuración:**\n• **Credenciales de Cuenta** - Iniciar sesión en el portal SFPUC\n• **Acceso a Datos** - Descargar datos históricos de uso\n• **Creación de Sensor** - Sensor de uso diario de agua en galones\n• **Configuración de Actualización** - Configurar intervalo de actualización\n\n**Cómo Funciona:**\n\n🔐 **Inicio de Sesión SFPUC**\n• Autenticación segura al portal de agua SFPUC\n• Acceso al histórico de uso de tu cuenta\n• Gestión automática de sesión\n\n📊 **Datos de Uso**\n• Descarga archivos Excel con datos históricos\n• Analiza consumo diario de agua\n• Almacena datos en la base de datos de Home Assistant\n\n💧 **Sensor de Agua**\n• Uso diario en galones (acumulativo)\n• Clase de estado: TOTAL_INCREASING\n• Clase de dispositivo: agua\n\n**Consejos de Configuración:**\n• El nombre de usuario es típicamente tu número de cuenta o email\n• La contraseña es tu contraseña del portal SFPUC\n• Intervalo de actualización: 15-1440 minutos (recomendado: 60-240)\n• Los datos se almacenan localmente en la base de datos de Home Assistant",
+        "description": "Conéctate a tu cuenta SFPUC para monitorear el uso de agua.\n\n**Requerido:** Nombre de usuario y contraseña de SFPUC para acceso a la cuenta.\n\n**Proceso de Configuración:**\n• **Credenciales de Cuenta** - Iniciar sesión en el portal SFPUC\n• **Acceso a Datos** - Descargar datos históricos de uso\n• **Creación de Sensor** - Sensor de uso diario de agua en galones\n• **Actualizaciones Automáticas** - Los datos se actualizan cada 12 horas\n\n**Cómo Funciona:**\n\n🔐 **Inicio de Sesión SFPUC**\n• Autenticación segura al portal de agua SFPUC\n• Acceso al histórico de uso de tu cuenta\n• Gestión automática de sesión\n\n📊 **Datos de Uso**\n• Descarga archivos Excel con datos históricos\n• Analiza consumo diario de agua\n• Almacena datos en la base de datos de Home Assistant\n\n💧 **Sensor de Agua**\n• Uso diario en galones (acumulativo)\n• Clase de estado: TOTAL_INCREASING\n• Clase de dispositivo: agua\n• Se actualiza cada 12 horas\n\n**Consejos de Configuración:**\n• El nombre de usuario es típicamente tu número de cuenta o email\n• La contraseña es tu contraseña del portal SFPUC\n• Los datos se actualizan automáticamente cada 12 horas\n• Todos los datos se almacenan localmente en la base de datos de Home Assistant",
         "data": {
           "username": "Nombre de Usuario SFPUC",
-          "password": "Contraseña SFPUC",
-          "update_interval": "Intervalo de Actualización (minutos)"
+          "password": "Contraseña SFPUC"
         },
         "data_description": {
           "username": "Tu nombre de usuario de cuenta SFPUC o número de cuenta utilizado para iniciar sesión en el portal de agua.",
-          "password": "Tu contraseña de cuenta SFPUC para acceder a los datos de uso.",
-          "update_interval": "Con qué frecuencia verificar nuevos datos de uso de agua. Rango: 15-1440 minutos. Recomendado: 60-240 minutos."
+          "password": "Tu contraseña de cuenta SFPUC para acceder a los datos de uso."
         }
       }
     },
@@ -25,17 +23,8 @@
     "step": {
       "init": {
         "title": "Configuración de Agua SF",
-        "description": "Actualiza la configuración de tu cuenta SFPUC y el intervalo de actualización de datos.",
-        "data": {
-          "update_interval": "Intervalo de Actualización (minutos)"
-        },
-        "data_description": {
-          "update_interval": "Con qué frecuencia verificar nuevos datos de uso de agua. Rango: 15-1440 minutos. Valores más bajos proporcionan actualizaciones más frecuentes pero pueden aumentar la carga en los servidores SFPUC."
-        }
+        "description": "La integración de Agua SF usa configuraciones automáticas optimizadas para datos diarios de uso de agua. Las actualizaciones ocurren cada 12 horas para mantenerse al día con los datos SFPUC mientras se respetan los recursos del servidor.\n\n**Configuración Actual:**\n• Intervalo de actualización: Fijo en 12 horas\n• Fuente de datos: Uso diario SFPUC\n• Almacenamiento: Base de datos local de Home Assistant\n\nNo se necesitan cambios de configuración."
       }
-    },
-    "error": {
-      "unknown": "❌ Ocurrió un error inesperado al actualizar la configuración."
     }
   },
   "entity": {
