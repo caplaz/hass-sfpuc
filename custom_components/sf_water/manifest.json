@@ -1,0 +1,19 @@
+{
+  "domain": "sf_water",
+  "name": "SF Water",
+  "codeowners": ["@caplaz"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/caplaz/hass-sfpuc",
+  "integration_type": "device",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/caplaz/hass-sfpuc/issues",
+  "loggers": ["custom_components.sf_water"],
+  "requirements": [
+    "requests>=2.25.1",
+    "beautifulsoup4>=4.9.3",
+    "voluptuous>=0.13.1"
+  ],
+  "supported_locales": ["en", "es"],
+  "version": "1.0.0"
+}

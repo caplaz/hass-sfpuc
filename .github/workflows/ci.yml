@@ -1,0 +1,285 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install build dependencies
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+          # Install from requirements file with binary preference
+          pip install --prefer-binary -r requirements-dev.txt
+
+      - name: Check code formatting with Black
+        run: black --check --diff custom_components/
+
+      - name: Check import sorting with isort
+        run: isort --check-only --diff custom_components/
+
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 custom_components/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 custom_components/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+      - name: Type checking with mypy
+        run: mypy custom_components/ --ignore-missing-imports
+
+  validate:
+    name: Home Assistant Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate HACS
+        uses: hacs/action@main
+        with:
+          category: integration
+
+      - name: Validate with hassfest
+        uses: home-assistant/actions/hassfest@master
+
+      - name: Validate Custom Component Structure
+        run: |
+          # Check required files exist
+          if [ ! -f custom_components/sf_water/__init__.py ]; then
+            echo "Missing __init__.py"
+            exit 1
+          fi
+
+          if [ ! -f custom_components/sf_water/manifest.json ]; then
+            echo "Missing manifest.json"
+            exit 1
+          fi
+
+          # Validate manifest.json structure
+          python -c "
+          import json
+          import sys
+
+          try:
+              with open('custom_components/sf_water/manifest.json') as f:
+                  manifest = json.load(f)
+
+              required_fields = ['domain', 'name', 'version', 'documentation', 'issue_tracker', 'requirements', 'codeowners']
+              missing_fields = [field for field in required_fields if field not in manifest]
+
+              if missing_fields:
+                  print(f'Missing required manifest fields: {missing_fields}')
+                  sys.exit(1)
+
+              print('Custom component validation passed')
+          except Exception as e:
+              print(f'Manifest validation failed: {e}')
+              sys.exit(1)
+          "
+
+      - name: Test Component Import
+        run: |
+          # Set up Python environment
+          python -m pip install --upgrade pip
+          pip install homeassistant==2025.1.4
+
+          # Test that the component can be imported
+          export PYTHONPATH="${PWD}:${PYTHONPATH}"
+          python -c "
+          import sys
+          sys.path.insert(0, 'custom_components')
+
+          try:
+              from sf_water import DOMAIN
+              print(f'✅ Component import successful, domain: {DOMAIN}')
+
+              from sf_water.config_flow import ConfigFlow
+              print('✅ Config flow import successful')
+
+              from sf_water.sensor import SFWaterSensor
+              print('✅ Sensor import successful')
+
+          except Exception as e:
+              print(f'❌ Component import failed: {e}')
+              sys.exit(1)
+          "
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+        home-assistant-version: ["2025.1.4"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Home Assistant ${{ matrix.home-assistant-version }}
+        run: |
+          python -m pip install --upgrade pip
+          # Install build dependencies for C extensions
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev libffi-dev libssl-dev
+          # Use --only-binary to prefer pre-built wheels and avoid compilation issues
+          pip install --only-binary=aiohttp,yarl,multidict homeassistant==${{ matrix.home-assistant-version }}
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:${PWD}"
+          # Run validation tests (config flow tests require complex HA setup)
+          python -m pytest tests/test_validation.py -v --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        if: always()
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Run security scan
+        run: bandit -r custom_components/ -f json -o bandit-report.json
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check README.md
+        run: |
+          # Check that README exists and has minimum content
+          if [ ! -f README.md ]; then
+            echo "README.md is missing"
+            exit 1
+          fi
+
+          # Check for required sections
+          if ! grep -q "## Installation" README.md; then
+            echo "README.md missing Installation section"
+            exit 1
+          fi
+
+          if ! grep -q "## Configuration" README.md; then
+            echo "README.md missing Configuration section"
+            exit 1
+          fi
+
+      - name: Check manifest.json
+        run: |
+          python -c "
+          import json
+          with open('custom_components/sf_water/manifest.json') as f:
+              manifest = json.load(f)
+
+          required_fields = ['domain', 'name', 'version', 'documentation', 'issue_tracker', 'codeowners']
+          for field in required_fields:
+              if field not in manifest:
+                  print(f'Missing required field: {field}')
+                  exit(1)
+
+          print('manifest.json validation passed')
+          "
+
+      - name: Validate CHANGELOG.md
+        run: |
+          if [ ! -f CHANGELOG.md ]; then
+            echo "CHANGELOG.md is missing"
+            exit 1
+          fi
+
+          if ! grep -q "## " CHANGELOG.md; then
+            echo "CHANGELOG.md appears to be empty or improperly formatted"
+            exit 1
+          fi
+
+  release-check:
+    name: Release Readiness
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [lint, validate, test, security, documentation]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version consistency
+        run: |
+          # Extract version from manifest.json
+          MANIFEST_VERSION=$(python -c "
+          import json
+          with open('custom_components/sf_water/manifest.json') as f:
+              print(json.load(f)['version'])
+          ")
+
+          # Extract version from version.py
+          VERSION_PY=$(python -c "
+          import sys
+          sys.path.append('custom_components/sf_water')
+          from version import __version__
+          print(__version__)
+          ")
+
+          echo "Manifest version: $MANIFEST_VERSION"
+          echo "Version.py version: $VERSION_PY"
+
+          if [ "$MANIFEST_VERSION" != "$VERSION_PY" ]; then
+            echo "Version mismatch between manifest.json and version.py"
+            exit 1
+          fi
+
+          echo "Version consistency check passed"
+
+      - name: Generate release notes
+        run: |
+          echo "## Release Summary" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Changes in this release:" >> release_notes.md
+          git log --oneline --since="1 week ago" >> release_notes.md
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release_notes.md

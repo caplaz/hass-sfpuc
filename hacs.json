@@ -1,0 +1,7 @@
+{
+  "name": "SF Water",
+  "render_readme": true,
+  "filename": "sf_water.zip",
+  "homeassistant": "2023.1.0",
+  "country": ["US"]
+}
