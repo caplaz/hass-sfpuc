@@ -31,6 +31,12 @@
     "sensor": {
       "daily_usage": {
         "name": "Daily water usage"
+      },
+      "hourly_usage": {
+        "name": "Hourly water usage"
+      },
+      "monthly_usage": {
+        "name": "Monthly water usage"
       }
     }
   }

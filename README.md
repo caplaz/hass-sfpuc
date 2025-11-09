@@ -14,12 +14,14 @@ A Home Assistant custom integration for monitoring San Francisco water usage fro
 
 ### Data Flow Overview
 
-The SF Water integration provides historical utility data for the Home Assistant Energy dashboard, following modern smart home integration patterns.
+The SF Water integration provides comprehensive historical utility data for the Home Assistant Energy dashboard, with multiple data resolutions.
 
 ```
 SFPUC Portal → Integration → Home Assistant → Energy Dashboard
       ↓              ↓              ↓              ↓
    Login/Auth    Scrape Data    Store Data    Visualize Usage
+   Historical    Multiple       Statistics     Trends &
+   Data          Resolutions    Database       Analytics
 ```
 
 ### Step-by-Step Process
@@ -30,47 +32,51 @@ SFPUC Portal → Integration → Home Assistant → Energy Dashboard
    - Maintains secure session for data access
    - Handles authentication errors gracefully
 
-2. **Data Fetching** 📊
+2. **Historical Data Fetching** �
 
-   - Connects to SFPUC's hourly usage page
-   - Downloads Excel files containing water usage data
-   - Parses data locally on your Home Assistant instance
-   - Extracts daily water consumption in gallons
+   - **Initial Setup**: Downloads 2 years of monthly data, 90 days of daily data, 30 days of hourly data
+   - **Multiple Resolutions**: Fetches data at hourly, daily, and monthly intervals
+   - **Backfilling**: Automatically fills missing data with 30-day lookback window
+   - **Incremental Updates**: Adds new data points as they become available
 
 3. **Data Processing** ⚙️
 
-   - Converts raw SFPUC data into Home Assistant sensor format
-   - Applies proper device class (`water`) and state class (`total_increasing`)
-   - Calculates cumulative usage for accurate tracking
+   - Converts raw SFPUC Excel data into structured Home Assistant sensor format
+   - Applies proper device classes and state classes for each resolution
+   - Calculates cumulative usage for accurate tracking across all time periods
 
 4. **Statistics Insertion** 📈
 
-   - Inserts usage data into Home Assistant's recorder database
-   - Creates historical statistics for Energy dashboard integration
-   - Enables long-term usage analysis and trends
+   - Inserts usage data into Home Assistant's recorder database at multiple resolutions
+   - Creates separate statistics streams for hourly, daily, and monthly data
+   - Enables comprehensive historical analysis and Energy dashboard integration
+   - Supports long-term usage trends and comparative analysis
 
 5. **Sensor Updates** 🔄
-   - Updates sensor state with latest daily usage
+   - Updates sensors with latest data from each resolution
    - Provides real-time data to dashboards and automations
    - Maintains data availability and handles connection issues
 
 ### Energy Dashboard Integration
 
-This integration enables water usage tracking in Home Assistant's Energy dashboard:
+This integration enables comprehensive water usage tracking in Home Assistant's Energy dashboard:
 
-- **Historical Data**: Past usage data is stored and accessible
+- **Multi-Resolution Data**: Hourly, daily, and monthly usage statistics
+- **Historical Data**: Past usage data going back months/years
+- **Backfilling**: Automatic gap-filling for missing data points
 - **Statistics**: Proper statistics metadata for dashboard calculations
 - **Cost Tracking**: Foundation for future cost calculation features
-- **Comparative Analysis**: Track usage patterns over time
+- **Comparative Analysis**: Track usage patterns across different time scales
 
 ### Update Cycle
 
 - **Frequency**: Fixed 12-hour intervals (appropriate for daily water usage data)
-- **Rationale**: SFPUC provides daily water usage data, so frequent updates aren't necessary
-- **Pattern**: Follows Home Assistant utility integration best practices (similar to Opower)
-- **Trigger**: Time-based coordinator updates
-- **Scope**: Fetches current daily usage (historical data via statistics)
-- **Storage**: All data stored locally in Home Assistant database
+- **Historical Fetching**: Comprehensive data download on first setup
+- **Backfilling**: 30-day lookback window for missing data (runs periodically)
+- **Pattern**: Follows Home Assistant utility integration best practices
+- **Trigger**: Time-based coordinator updates with intelligent backfilling
+- **Scope**: Fetches current data plus fills historical gaps
+- **Storage**: All data stored locally in Home Assistant database with multiple resolutions
 
 ## Installation
 
@@ -136,13 +142,30 @@ HACS (Home Assistant Community Store) is the easiest way to install and manage c
 
 ### Sensors Created
 
-The integration creates one main sensor:
+The integration creates multiple sensors for different time resolutions:
 
 - **SF Water Daily Usage** (`sensor.sf_water_daily_usage`)
+
   - **State**: Daily water usage in gallons
   - **Device Class**: `water`
   - **State Class**: `total_increasing`
   - **Unit**: `gal` (gallons)
+  - **Update**: Every 12 hours
+
+- **SF Water Hourly Usage** (`sensor.sf_water_hourly_usage`)
+
+  - **State**: Most recent hourly water usage in gallons
+  - **Device Class**: `water`
+  - **State Class**: `total_increasing`
+  - **Unit**: `gal` (gallons)
+  - **Update**: Every 12 hours
+
+- **SF Water Monthly Usage** (`sensor.sf_water_monthly_usage`)
+  - **State**: Current month-to-date water usage in gallons
+  - **Device Class**: `water`
+  - **State Class**: `total_increasing`
+  - **Unit**: `gal` (gallons)
+  - **Update**: Every 12 hours
 
 ### Dashboard Integration
 
@@ -277,4 +300,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-_This integration is not officially affiliated with or endorsed by the San Francisco Public Utilities Commission (SFPUC). Use at your own risk and in accordance with SFPUC's terms of service._
+## ⚠️ Important Disclaimer
+
+**This project is not affiliated with or endorsed by the San Francisco Public Utilities Commission (SFPUC) or https://www.sfpuc.gov.**
+
+This is an unofficial, community-maintained integration that scrapes data from the SFPUC website. As such:
+
+- **It can break at any time** due to changes in SFPUC's website structure, authentication methods, or data formats
+- **Use at your own risk** - the integration may stop working without notice
+- **No guarantees** of functionality, accuracy, or continued operation
+- **Not responsible for any issues** that may arise from using this integration
+- **Please use responsibly** and in accordance with SFPUC's terms of service
+
+If the integration stops working, please check the [GitHub Issues](https://github.com/caplaz/hass-sfpuc/issues) for updates or create a new issue.

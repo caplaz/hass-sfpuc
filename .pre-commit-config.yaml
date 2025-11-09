@@ -59,7 +59,7 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [types-requests]
-        args: ["--ignore-missing-imports"]
+        args: ["--config-file", "mypy.ini"]
 
   # bandit - Security linter
   - repo: https://github.com/PyCQA/bandit

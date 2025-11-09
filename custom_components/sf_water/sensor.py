@@ -48,8 +48,25 @@ WATER_SENSORS: tuple[SFWaterEntityDescription, ...] = (
         suggested_display_precision=1,
         value_fn=lambda data: data.get("daily_usage", 0),
     ),
+    SFWaterEntityDescription(
+        key="hourly_usage",
+        translation_key="hourly_usage",
+        device_class=SensorDeviceClass.WATER,
+        native_unit_of_measurement=UnitOfVolume.GALLONS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.get("hourly_usage", 0),
+    ),
+    SFWaterEntityDescription(
+        key="monthly_usage",
+        translation_key="monthly_usage",
+        device_class=SensorDeviceClass.WATER,
+        native_unit_of_measurement=UnitOfVolume.GALLONS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.get("monthly_usage", 0),
+    ),
     # TODO: Add more sensors like usage_to_date, forecasted_usage, etc.
-    # Similar to OPOWER's approach
 )
 
 

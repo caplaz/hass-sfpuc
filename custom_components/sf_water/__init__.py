@@ -35,7 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = SFWaterCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
 
-    # Store coordinator in entry runtime data (like OPOWER)
+    # Store coordinator in entry runtime data
     entry.runtime_data = coordinator
 
     # Set up platforms
