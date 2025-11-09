@@ -5,10 +5,11 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/caplaz/hass-sfpuc",
-  "integration_type": "device",
+  "integration_type": "integration",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/caplaz/hass-sfpuc/issues",
   "loggers": ["custom_components.sf_water"],
+  "quality_scale": "silver",
   "requirements": [
     "requests>=2.25.1",
     "beautifulsoup4>=4.9.3",
