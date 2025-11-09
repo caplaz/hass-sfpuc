@@ -52,3 +52,33 @@ repos:
       - id: trailing-whitespace
       - id: mixed-line-ending
         args: ["--fix=lf"]
+
+  # mypy - Static type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-requests]
+        args: ["--ignore-missing-imports"]
+
+  # bandit - Security linter
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml"]
+        exclude: ^tests/
+
+  # codespell - Check for common misspellings
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        args: ["--ignore-words-list", "hass"]
+
+  # yamllint - YAML linter
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: ["-c", ".yamllint.yaml"]

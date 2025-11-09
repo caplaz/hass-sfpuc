@@ -4,7 +4,7 @@ DOMAIN = "sf_water"
 
 # Configuration options
 CONF_USERNAME = "username"
-CONF_PASSWORD = "password"
+CONF_PASSWORD = "password"  # nosec B105
 CONF_UPDATE_INTERVAL = "update_interval"
 
 # Default configuration values

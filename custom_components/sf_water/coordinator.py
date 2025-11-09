@@ -6,19 +6,18 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any
 
-import requests
 from bs4 import BeautifulSoup
-
 from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
 from homeassistant.components.recorder.statistics import async_add_external_statistics
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+import requests
 
 from .const import CONF_PASSWORD, CONF_UPDATE_INTERVAL, CONF_USERNAME, DOMAIN
 
-type SFWaterConfigEntry = Any  # TODO: Import from config_entries when available
+SFWaterConfigEntry = Any  # TODO: Import from config_entries when available
 
 
 class SFPUCScraper:
@@ -32,15 +31,17 @@ class SFPUCScraper:
         self.base_url = "https://myaccount-water.sfpuc.org"
 
         # Mimic a real browser
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+            }
+        )
 
     def login(self) -> bool:
         """Login to SFPUC account."""
@@ -48,36 +49,40 @@ class SFPUCScraper:
             # GET the login page to extract ViewState
             login_url = f"{self.base_url}/"
             response = self.session.get(login_url)
-            soup = BeautifulSoup(response.content, 'html.parser')
+            soup = BeautifulSoup(response.content, "html.parser")
 
             # Extract hidden form fields
-            viewstate = soup.find('input', {'name': '__VIEWSTATE'})
-            eventvalidation = soup.find('input', {'name': '__EVENTVALIDATION'})
-            viewstate_generator = soup.find('input', {'name': '__VIEWSTATEGENERATOR'})
+            viewstate = soup.find("input", {"name": "__VIEWSTATE"})
+            eventvalidation = soup.find("input", {"name": "__EVENTVALIDATION"})
+            viewstate_generator = soup.find("input", {"name": "__VIEWSTATEGENERATOR"})
 
             if not viewstate or not eventvalidation:
                 return False
 
             # Login form data
             login_data = {
-                '__EVENTTARGET': '',
-                '__EVENTARGUMENT': '',
-                '__VIEWSTATE': viewstate['value'],
-                '__VIEWSTATEGENERATOR': viewstate_generator['value'] if viewstate_generator else '',
-                '__SCROLLPOSITIONX': '0',
-                '__SCROLLPOSITIONY': '0',
-                '__EVENTVALIDATION': eventvalidation['value'],
-                'tb_USER_ID': self.username,
-                'tb_USER_PSWD': self.password,
-                'cb_REMEMBER_ME': 'on',
-                'btn_SIGN_IN_BUTTON': 'Sign+in'
+                "__EVENTTARGET": "",
+                "__EVENTARGUMENT": "",
+                "__VIEWSTATE": viewstate["value"],
+                "__VIEWSTATEGENERATOR": (
+                    viewstate_generator["value"] if viewstate_generator else ""
+                ),
+                "__SCROLLPOSITIONX": "0",
+                "__SCROLLPOSITIONY": "0",
+                "__EVENTVALIDATION": eventvalidation["value"],
+                "tb_USER_ID": self.username,
+                "tb_USER_PSWD": self.password,
+                "cb_REMEMBER_ME": "on",
+                "btn_SIGN_IN_BUTTON": "Sign+in",
             }
 
             # Submit login
-            response = self.session.post(login_url, data=login_data, allow_redirects=True)
+            response = self.session.post(
+                login_url, data=login_data, allow_redirects=True
+            )
 
             # Check if login successful
-            if 'MY_ACCOUNT_RSF.aspx' in response.url or 'Welcome' in response.text:
+            if "MY_ACCOUNT_RSF.aspx" in response.url or "Welcome" in response.text:
                 return True
             else:
                 return False
@@ -91,40 +96,44 @@ class SFPUCScraper:
             # Navigate to hourly usage page
             usage_url = f"{self.base_url}/USE_HOURLY.aspx"
             response = self.session.get(usage_url)
-            soup = BeautifulSoup(response.content, 'html.parser')
+            soup = BeautifulSoup(response.content, "html.parser")
 
             # Extract form tokens
             tokens = {}
-            form = soup.find('form')
+            form = soup.find("form")
             if form:
-                for inp in form.find_all('input'):
-                    name = inp.get('name')
+                for inp in form.find_all("input"):
+                    name = inp.get("name")
                     if name:
-                        tokens[name] = inp.get('value', '')
+                        tokens[name] = inp.get("value", "")
 
             # Set download parameters for today's usage
-            today = datetime.now().strftime('%m/%d/%Y')
-            tokens.update({
-                'img_EXCEL_DOWNLOAD_IMAGE.x': '8',
-                'img_EXCEL_DOWNLOAD_IMAGE.y': '13',
-                'tb_DAILY_USE': 'Hourly+Use',
-                'SD': today,
-                'dl_UOM': 'GALLONS'
-            })
+            today = datetime.now().strftime("%m/%d/%Y")
+            tokens.update(
+                {
+                    "img_EXCEL_DOWNLOAD_IMAGE.x": "8",
+                    "img_EXCEL_DOWNLOAD_IMAGE.y": "13",
+                    "tb_DAILY_USE": "Hourly+Use",
+                    "SD": today,
+                    "dl_UOM": "GALLONS",
+                }
+            )
 
             # POST to trigger download
             download_url = f"{self.base_url}/USE_HOURLY.aspx"
-            response = self.session.post(download_url, data=tokens, allow_redirects=True)
+            response = self.session.post(
+                download_url, data=tokens, allow_redirects=True
+            )
 
-            if 'TRANSACTIONS_EXCEL_DOWNLOAD.aspx' in response.url:
+            if "TRANSACTIONS_EXCEL_DOWNLOAD.aspx" in response.url:
                 # Parse the Excel data
-                content = response.content.decode('utf-8', errors='ignore')
-                lines = content.split('\n')
+                content = response.content.decode("utf-8", errors="ignore")
+                lines = content.split("\n")
 
                 total_usage = 0.0
                 for line in lines[1:]:  # Skip header
                     if line.strip():
-                        parts = line.split('\t')
+                        parts = line.split("\t")
                         if len(parts) >= 2:
                             try:
                                 usage = float(parts[1])

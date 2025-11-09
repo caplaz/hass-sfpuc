@@ -3,22 +3,30 @@
 import logging
 from typing import Any
 
-import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
-from homeassistant.exceptions import HomeAssistantError
+import voluptuous as vol
 
-from .const import CONF_PASSWORD, CONF_UPDATE_INTERVAL, CONF_USERNAME, DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .const import (
+    CONF_PASSWORD,
+    CONF_UPDATE_INTERVAL,
+    CONF_USERNAME,
+    DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class SFWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class SFWaterConfigFlow(config_entries.ConfigFlow):
     """Handle a config flow for SF Water."""
 
     VERSION = 1
+    DOMAIN = DOMAIN
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         errors = {}
 
@@ -26,7 +34,10 @@ class SFWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 # Validate credentials by attempting login
                 from .coordinator import SFPUCScraper
-                scraper = SFPUCScraper(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
+
+                scraper = SFPUCScraper(
+                    user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                )
                 if scraper.login():
                     return self.async_create_entry(
                         title="SF Water",
@@ -35,7 +46,9 @@ class SFWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },
                         options={
-                            CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                            CONF_UPDATE_INTERVAL: user_input.get(
+                                CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                            ),
                         },
                     )
                 else:
@@ -46,13 +59,15 @@ class SFWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({
-                vol.Required(CONF_USERNAME): str,
-                vol.Required(CONF_PASSWORD): str,
-                vol.Optional(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL): vol.All(
-                    vol.Coerce(int), vol.Range(min=15, max=1440)
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_USERNAME): str,
+                    vol.Required(CONF_PASSWORD): str,
+                    vol.Optional(
+                        CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL
+                    ): vol.All(vol.Coerce(int), vol.Range(min=15, max=1440)),
+                }
+            ),
             errors=errors,
         )
 
@@ -76,10 +91,14 @@ class SFWaterOptionsFlowHandler(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({
-                vol.Optional(
-                    CONF_UPDATE_INTERVAL,
-                    default=self.config_entry.options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
-                ): vol.All(vol.Coerce(int), vol.Range(min=15, max=1440)),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_UPDATE_INTERVAL,
+                        default=self.config_entry.options.get(
+                            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=15, max=1440)),
+                }
+            ),
         )

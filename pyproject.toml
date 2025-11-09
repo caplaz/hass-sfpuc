@@ -66,3 +66,7 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".git", "__pycache__"]
+skips = ["B101", "B601"]  # Skip assert checks and shell usage in subprocess
