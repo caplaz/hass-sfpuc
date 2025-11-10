@@ -137,5 +137,5 @@ async def async_setup_entry(
     coordinator = config_entry.runtime_data
 
     async_add_entities(
-        SFWaterSensor(coordinator, description) for description in WATER_SENSORS
+        [SFWaterSensor(coordinator, description) for description in WATER_SENSORS]
     )
