@@ -706,14 +706,13 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.logger.error("Unknown resolution for statistics: %s", resolution)
                 return
 
-            metadata = StatisticMetaData(
+            metadata = StatisticMetaData(  # type: ignore[typeddict-item]
                 has_mean=False,
                 has_sum=has_sum,
                 mean_type=StatisticMeanType.NONE,
                 name=name,
                 source=DOMAIN,
                 statistic_id=stat_id,
-                unit_class=None,
                 unit_of_measurement=UnitOfVolume.GALLONS,
             )
 
@@ -772,14 +771,13 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Insert legacy daily statistics (backward compatibility)."""
         try:
             # Create statistic metadata for daily water usage
-            metadata = StatisticMetaData(
+            metadata = StatisticMetaData(  # type: ignore[typeddict-item]
                 has_mean=False,
                 has_sum=True,
                 mean_type=StatisticMeanType.NONE,
                 name="SF Water Daily Usage",
                 source=DOMAIN,
                 statistic_id=f"{DOMAIN}:daily_usage",
-                unit_class=None,
                 unit_of_measurement=UnitOfVolume.GALLONS,
             )
 
