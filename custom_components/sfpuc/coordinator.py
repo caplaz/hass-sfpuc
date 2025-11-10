@@ -605,7 +605,7 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch historical data going back months/years on first run.
 
         Populates recorder statistics with:
-        - Daily usage data for the past 90 days
+        - Daily usage data for the past 2 years
         - Hourly usage data for the past 30 days
 
         Note: Monthly billing cycle data is skipped as SFPUC billing cycles
@@ -618,16 +618,8 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.logger.info("Fetching historical water usage data...")
 
             # Fetch data at different resolutions
-            # Start with monthly data for the past 2 years
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=730)  # 2 years
-
             loop = asyncio.get_event_loop()
-            self.logger.debug(
-                "Fetching monthly data from %s to %s",
-                start_date.date(),
-                end_date.date(),
-            )
 
             # Skip monthly data fetching - SFPUC provides billing cycle data (25th-25th)
             # which doesn't align with calendar months and may be confusing for users
@@ -635,8 +627,8 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "Skipping monthly historical data fetch - using daily data for historical trends"
             )
 
-            # Fetch daily data for the past 90 days (more detailed recent data)
-            start_date = end_date - timedelta(days=90)
+            # Fetch daily data for the past 2 years (comprehensive historical data)
+            start_date = end_date - timedelta(days=730)
             self.logger.debug(
                 "Fetching daily data from %s to %s", start_date.date(), end_date.date()
             )
