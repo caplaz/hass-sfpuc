@@ -437,6 +437,13 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_backfill_date: datetime | None = None
         self._historical_data_fetched = False
 
+    def update_credentials(self, username: str, password: str) -> None:
+        """Update the scraper credentials."""
+        self.logger.info(
+            "Updating SFPUC credentials for user: %s", username[:3] + "***"
+        )
+        self.scraper = SFPUCScraper(username, password)
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from SF PUC."""
         try:
