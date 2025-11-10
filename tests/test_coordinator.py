@@ -89,8 +89,8 @@ class TestSFWaterCoordinator:
         assert result["monthly_usage"] == 200.0  # Current month usage
         assert coordinator._historical_data_fetched is True
 
-        # Verify historical data was fetched (3 historical + 2 current + 2 backfill)
-        assert mock_scraper.get_usage_data.call_count == 7
+        # Verify historical data was fetched (2 historical + 2 current + 2 backfill)
+        assert mock_scraper.get_usage_data.call_count == 6
 
     @patch("custom_components.sf_water.coordinator.SFPUCScraper")
     @pytest.mark.asyncio
@@ -132,14 +132,6 @@ class TestSFWaterCoordinator:
         mock_scraper = Mock()
         mock_scraper_class.return_value = mock_scraper
         mock_scraper.get_usage_data.side_effect = [
-            # Monthly data
-            [
-                {
-                    "timestamp": datetime(2023, 8, 1),
-                    "usage": 4500.0,
-                    "resolution": "monthly",
-                }
-            ],
             # Daily data
             [
                 {
@@ -166,10 +158,10 @@ class TestSFWaterCoordinator:
             await coordinator._async_fetch_historical_data()
 
         # Verify historical data calls
-        assert mock_scraper.get_usage_data.call_count == 3
+        assert mock_scraper.get_usage_data.call_count == 2
 
         # Verify statistics were added
-        assert mock_add_stats.call_count == 3
+        assert mock_add_stats.call_count == 2
 
     @patch("custom_components.sf_water.coordinator.SFPUCScraper")
     @patch("custom_components.sf_water.coordinator._LOGGER")
@@ -312,9 +304,7 @@ class TestSFWaterCoordinator:
         ) as mock_add_stats:
             await coordinator._async_insert_statistics(monthly_data)
 
-        mock_add_stats.assert_called_once()
-        call_args = mock_add_stats.call_args
-        assert len(call_args[0]) == 3  # hass, metadata, statistics
+        mock_add_stats.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_insert_statistics_legacy_float(self, hass, config_entry):

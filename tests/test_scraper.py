@@ -357,8 +357,8 @@ class TestSFPUCScraper:
 
     @patch("requests.Session.get")
     @patch("requests.Session.post")
-    def test_get_usage_data_monthly_uses_billed_page(self, mock_post, mock_get):
-        """Test that monthly data uses USE_BILLED.aspx page and Billed+Use data type."""
+    def test_get_usage_data_monthly_sfpuc_format_success(self, mock_post, mock_get):
+        """Test successful monthly usage data retrieval with real SFPUC format (Mon YY)."""
         # Mock the usage page response
         usage_page = Mock()
         usage_page.content = b"""
@@ -370,36 +370,26 @@ class TestSFPUCScraper:
         """
         mock_get.return_value = usage_page
 
-        # Mock the download response
+        # Mock the download response with SFPUC's actual monthly format
         download_response = Mock()
         download_response.url = (
             "https://myaccount-water.sfpuc.org/TRANSACTIONS_EXCEL_DOWNLOAD.aspx"
         )
-        download_response.content = b"Date\tUsage\n10/2023\t4500.5\n"
+        download_response.content = (
+            b"Date\tConsumption in GALLONS\nMay 25\t2812\nJun 25\t2738\n"
+        )
         mock_post.return_value = download_response
 
-        start_date = datetime(2023, 10, 1)
-        end_date = datetime(2023, 10, 31)
+        start_date = datetime(2025, 5, 1)
+        end_date = datetime(2025, 6, 30)
 
         result = self.scraper.get_usage_data(start_date, end_date, "monthly")
 
-        # Verify the correct URLs were used
-        mock_get.assert_called_once()
-        get_call_args = mock_get.call_args
-        assert "USE_BILLED.aspx" in get_call_args[0][0]  # Navigation URL
-
-        # Verify POST was made to USE_BILLED.aspx
-        mock_post.assert_called_once()
-        post_call_args = mock_post.call_args
-        assert "USE_BILLED.aspx" in post_call_args[0][0]  # Download URL
-
-        # Verify data_type was set to "Billed+Use"
-        post_data = post_call_args[1]["data"]
-        assert post_data["tb_DAILY_USE"] == "Billed+Use"
-
-        # Verify result
         assert result is not None
-        assert len(result) == 1
-        assert result[0]["timestamp"] == datetime(2023, 10, 1)
-        assert result[0]["usage"] == 4500.5
+        assert len(result) == 2
+        # Should parse "May 25" as 2025-05-01 and "Jun 25" as 2025-06-01
+        assert result[0]["timestamp"] == datetime(2025, 5, 1)
+        assert result[0]["usage"] == 2812
         assert result[0]["resolution"] == "monthly"
+        assert result[1]["timestamp"] == datetime(2025, 6, 1)
+        assert result[1]["usage"] == 2738

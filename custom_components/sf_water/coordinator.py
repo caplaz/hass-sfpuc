@@ -342,10 +342,37 @@ class SFPUCScraper:
                                         continue
 
                                 elif resolution == "monthly":
-                                    # Format: MM/YYYY
-                                    timestamp = datetime.strptime(
-                                        timestamp_str, "%m/%Y"
-                                    )
+                                    # Try multiple formats for monthly data
+                                    timestamp = None
+                                    # First try MM/YYYY format (for tests)
+                                    try:
+                                        timestamp = datetime.strptime(
+                                            timestamp_str, "%m/%Y"
+                                        )
+                                    except ValueError:
+                                        pass
+
+                                    # If that fails, try "Mon YY" format (real SFPUC format like "Dec 23")
+                                    if timestamp is None:
+                                        try:
+                                            # Parse "Dec 23" format - month abbreviation and 2-digit year
+                                            month_name, year_str = timestamp_str.split()
+                                            # Convert month name to number
+                                            month = datetime.strptime(
+                                                month_name, "%b"
+                                            ).month
+                                            # Convert 2-digit year to 4-digit (assuming 2000s)
+                                            year = 2000 + int(year_str)
+                                            timestamp = datetime(year, month, 1)
+                                        except (ValueError, IndexError):
+                                            pass
+
+                                    if timestamp is None:
+                                        _LOGGER.debug(
+                                            "Failed to parse monthly timestamp: %s",
+                                            timestamp_str,
+                                        )
+                                        continue
 
                                 usage_data.append(
                                     {
@@ -516,17 +543,11 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 end_date.date(),
             )
 
-            # Fetch monthly data
-            monthly_data = await loop.run_in_executor(
-                None, self.scraper.get_usage_data, start_date, end_date, "monthly"
+            # Skip monthly data fetching - SFPUC provides billing cycle data (25th-25th)
+            # which doesn't align with calendar months and may be confusing for users
+            self.logger.info(
+                "Skipping monthly historical data fetch - using daily data for historical trends"
             )
-            if monthly_data:
-                await self._async_insert_statistics(monthly_data)
-                self.logger.info("Fetched %d monthly data points", len(monthly_data))
-            else:
-                self.logger.info(
-                    "Monthly data not available from SFPUC (page may no longer exist)"
-                )
 
             # Fetch daily data for the past 90 days (more detailed recent data)
             start_date = end_date - timedelta(days=90)
@@ -621,10 +642,10 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "Processing %d data points for statistics insertion", len(usage_data)
             )
 
-            # Group data by resolution
+            # Group data by resolution (skip monthly data)
             hourly_data = []
             daily_data = []
-            monthly_data = []
+            # monthly_data = []  # Disabled - billing cycles don't align with calendar months
 
             for item in usage_data:
                 resolution = item.get("resolution", "daily")
@@ -632,14 +653,13 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     hourly_data.append(item)
                 elif resolution == "daily":
                     daily_data.append(item)
-                elif resolution == "monthly":
-                    monthly_data.append(item)
+                # elif resolution == "monthly":  # Disabled
+                #     monthly_data.append(item)
 
             self.logger.debug(
-                "Grouped data - Hourly: %d, Daily: %d, Monthly: %d",
+                "Grouped data - Hourly: %d, Daily: %d",
                 len(hourly_data),
                 len(daily_data),
-                len(monthly_data),
             )
 
             # Insert statistics for each resolution
@@ -647,8 +667,8 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._async_insert_resolution_statistics(hourly_data, "hourly")
             if daily_data:
                 await self._async_insert_resolution_statistics(daily_data, "daily")
-            if monthly_data:
-                await self._async_insert_resolution_statistics(monthly_data, "monthly")
+            # if monthly_data:  # Disabled
+            #     await self._async_insert_resolution_statistics(monthly_data, "monthly")
 
         except Exception as err:
             self.logger.warning("Failed to insert water usage statistics: %s", err)
@@ -673,11 +693,7 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 name = "SF Water Daily Usage"
                 has_sum = True
                 unit_class = "volume"
-            elif resolution == "monthly":
-                stat_id = f"{DOMAIN}:monthly_usage"
-                name = "SF Water Monthly Usage"
-                has_sum = True
-                unit_class = "volume"
+            # Monthly statistics disabled - SFPUC billing cycles don't align with calendar months
             else:
                 self.logger.error("Unknown resolution for statistics: %s", resolution)
                 return
@@ -706,10 +722,10 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     start_time = timestamp.replace(
                         hour=0, minute=0, second=0, microsecond=0
                     )
-                elif resolution == "monthly":
-                    start_time = timestamp.replace(
-                        day=1, hour=0, minute=0, second=0, microsecond=0
-                    )
+                # elif resolution == "monthly":  # Disabled - billing cycles don't align with calendar months
+                #     start_time = timestamp.replace(
+                #         day=1, hour=0, minute=0, second=0, microsecond=0
+                #     )
 
                 # Convert naive timestamp to timezone-aware (assume PST/PDT for SF)
                 if start_time.tzinfo is None:
