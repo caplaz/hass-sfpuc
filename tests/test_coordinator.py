@@ -172,9 +172,10 @@ class TestSFWaterCoordinator:
         assert mock_add_stats.call_count == 3
 
     @patch("custom_components.sf_water.coordinator.SFPUCScraper")
+    @patch("custom_components.sf_water.coordinator._LOGGER")
     @pytest.mark.asyncio
     async def test_fetch_historical_data_failure(
-        self, mock_scraper_class, hass, config_entry
+        self, mock_logger, mock_scraper_class, hass, config_entry
     ):
         """Test historical data fetching with failures."""
         mock_scraper = Mock()
@@ -187,7 +188,7 @@ class TestSFWaterCoordinator:
         await coordinator._async_fetch_historical_data()
 
         # Verify logger was called
-        coordinator.logger.warning.assert_called()
+        mock_logger.warning.assert_called()
 
     @patch("custom_components.sf_water.coordinator.SFPUCScraper")
     @pytest.mark.asyncio

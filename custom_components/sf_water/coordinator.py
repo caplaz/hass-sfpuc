@@ -327,7 +327,7 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Initialize coordinator."""
         super().__init__(
             hass,
-            logger=hass.data[DOMAIN]["logger"],
+            logger=_LOGGER,
             name=DOMAIN,
             update_interval=timedelta(minutes=DEFAULT_UPDATE_INTERVAL),
         )
