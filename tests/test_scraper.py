@@ -335,23 +335,23 @@ class TestSFPUCScraper:
 
         assert result is not None
         assert len(result) == 4
-        # Should use current date for the timestamps
-        current_date = datetime.now().date()
+        # Should use the requested end_date for the timestamps
+        request_date = end_date.date()
         assert result[0]["timestamp"] == datetime.combine(
-            current_date, datetime.min.time().replace(hour=7)
+            request_date, datetime.min.time().replace(hour=7)
         )
         assert result[0]["usage"] == 7.48
         assert result[0]["resolution"] == "hourly"
         assert result[1]["timestamp"] == datetime.combine(
-            current_date, datetime.min.time().replace(hour=8)
+            request_date, datetime.min.time().replace(hour=8)
         )
         assert result[1]["usage"] == 14.96
         assert result[2]["timestamp"] == datetime.combine(
-            current_date, datetime.min.time().replace(hour=12)
+            request_date, datetime.min.time().replace(hour=12)
         )
         assert result[2]["usage"] == 0
         assert result[3]["timestamp"] == datetime.combine(
-            current_date, datetime.min.time().replace(hour=13)
+            request_date, datetime.min.time().replace(hour=13)
         )
         assert result[3]["usage"] == 0
 

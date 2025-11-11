@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 import voluptuous as vol
 
 from .const import CONF_PASSWORD, CONF_USERNAME, DOMAIN
-from .coordinator import SFPUCScraper
+from .scraper import SFPUCScraper
 
 _LOGGER = logging.getLogger(__name__)
 
