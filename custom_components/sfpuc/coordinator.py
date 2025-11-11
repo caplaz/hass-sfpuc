@@ -21,7 +21,7 @@ from homeassistant.components.recorder.statistics import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfVolume
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 import requests
@@ -466,6 +466,17 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             name=DOMAIN,
             update_interval=timedelta(minutes=DEFAULT_UPDATE_INTERVAL),
         )
+
+        # Add dummy listener to ensure coordinator updates continue
+        # even when all sensors are disabled
+        @callback
+        def _dummy_listener() -> None:
+            """Dummy listener to keep coordinator alive for statistics insertion."""
+            pass
+
+        self.async_add_listener(_dummy_listener)
+        self.logger.debug("Registered dummy listener to maintain statistics updates")
+
         self.config_entry = config_entry
         self.scraper = SFPUCScraper(
             config_entry.data[CONF_USERNAME],
