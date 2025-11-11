@@ -29,14 +29,8 @@
   },
   "entity": {
     "sensor": {
-      "daily_usage": {
-        "name": "Uso diario de agua"
-      },
-      "hourly_usage": {
-        "name": "Uso horario de agua"
-      },
-      "monthly_usage": {
-        "name": "Uso mensual de agua"
+      "current_bill_water_usage_to_date": {
+        "name": "Uso de agua del período de facturación actual hasta la fecha"
       }
     }
   }

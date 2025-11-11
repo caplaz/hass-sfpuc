@@ -10,14 +10,15 @@ from typing import Any
 from bs4 import BeautifulSoup
 from homeassistant.components.recorder import (
     DATA_INSTANCE,
+    get_instance,
 )
 from homeassistant.components.recorder.models import (
     StatisticData,
-    StatisticMeanType,
     StatisticMetaData,
 )
 from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
+    statistics_during_period,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfVolume
@@ -184,7 +185,11 @@ class SFPUCScraper:
                 return False
 
         except Exception as e:
-            _LOGGER.error("Exception during SFPUC login: %s", e)
+            _LOGGER.error(
+                "Exception during SFPUC login for user %s: %s",
+                self.username[:3] + "***",
+                e,
+            )
             return False
 
     def get_usage_data(
@@ -345,15 +350,40 @@ class SFPUCScraper:
                                         pass
 
                                     # If that fails, try MM/DD format without year (real SFPUC format)
+                                    # Use the year from the requested start_date to avoid defaulting to current year
                                     if timestamp is None:
                                         try:
                                             month, day = map(
                                                 int, timestamp_str.split("/")
                                             )
-                                            current_year = datetime.now().year
+                                            # Infer year from requested date range
+                                            # If the month is near the end of year and we're requesting data
+                                            # that spans year boundaries, we need to handle the year transition
+                                            requested_year = start_date.year
                                             timestamp = datetime(
-                                                current_year, month, day
+                                                requested_year, month, day
                                             )
+
+                                            # Handle year boundaries: if parsed date is before start_date
+                                            # and we're in December/January, it might be next year
+                                            if (
+                                                timestamp < start_date
+                                                and start_date.month == 12
+                                                and month == 1
+                                            ):
+                                                timestamp = datetime(
+                                                    requested_year + 1, month, day
+                                                )
+                                            # Or if parsed date is after end_date and we're crossing into
+                                            # previous year (Jan requesting Dec data)
+                                            elif (
+                                                timestamp > end_date
+                                                and end_date.month == 1
+                                                and month == 12
+                                            ):
+                                                timestamp = datetime(
+                                                    requested_year - 1, month, day
+                                                )
                                         except (ValueError, IndexError):
                                             pass
 
@@ -412,16 +442,29 @@ class SFPUCScraper:
                                 )
                                 continue
 
-                _LOGGER.info(
-                    "Successfully parsed %d %s data points", len(usage_data), resolution
-                )
+                if usage_data:
+                    dates = [item["timestamp"] for item in usage_data]
+                    _LOGGER.info(
+                        "Successfully parsed %d %s data points (from %s to %s)",
+                        len(usage_data),
+                        resolution,
+                        min(dates).strftime("%Y-%m-%d") if dates else "N/A",
+                        max(dates).strftime("%Y-%m-%d") if dates else "N/A",
+                    )
+                else:
+                    _LOGGER.info("Successfully parsed 0 %s data points", resolution)
                 return usage_data
             else:
                 _LOGGER.warning("Download failed - unexpected URL: %s", response.url)
                 return None
 
         except Exception as e:
-            _LOGGER.error("Exception during data retrieval: %s", e)
+            _LOGGER.error(
+                "Exception during %s data retrieval for user %s: %s",
+                resolution,
+                self.username[:3] + "***",
+                e,
+            )
             return None
 
     def get_daily_usage(self) -> float | None:
@@ -484,6 +527,7 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._last_backfill_date: datetime | None = None
         self._historical_data_fetched = False
+        self._checked_for_historical_data = False
 
     def _calculate_billing_period(self) -> tuple[datetime, datetime]:
         """Calculate current SFPUC billing period dates.
@@ -523,6 +567,43 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 bill_end = current_month_bill_date.replace(month=today.month + 1)
 
         return bill_start, bill_end
+
+    async def _async_check_has_historical_data(self) -> bool:
+        """Check if we already have sufficient historical data in the database.
+
+        Returns True if we have daily statistics going back at least 1 year.
+        This prevents re-fetching 2 years of data on every HA restart.
+        """
+        try:
+            # Check for daily statistics from 1 year ago
+            one_year_ago = datetime.now() - timedelta(days=365)
+            stat_id = f"{DOMAIN}:{self.config_entry.data[CONF_USERNAME]}_water_daily_consumption"
+
+            stats = await get_instance(self.hass).async_add_executor_job(
+                statistics_during_period,
+                self.hass,
+                dt_util.as_utc(one_year_ago),
+                None,  # end_time (None = now)
+                {stat_id},
+                "hour",  # period
+                None,  # units
+                {"sum"},  # types
+            )
+
+            # If we have statistics going back at least 1 year, consider historical data fetched
+            if stat_id in stats and len(stats[stat_id]) > 300:  # ~300 days minimum
+                self.logger.info(
+                    "Found %d existing daily statistics records - skipping historical data fetch",
+                    len(stats[stat_id]),
+                )
+                return True
+
+            self.logger.debug("No sufficient historical data found in database")
+            return False
+
+        except Exception as err:
+            self.logger.warning("Error checking for historical data: %s", err)
+            return False
 
     def update_credentials(self, username: str, password: str) -> None:
         """Update the scraper credentials.
@@ -569,14 +650,42 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             self.logger.debug("Login successful, proceeding with data fetch")
 
-            # Fetch historical data on first run
+            # Check if we need to fetch historical data
+            # Only check once per HA session to avoid repeated database queries
+            if not self._checked_for_historical_data:
+                has_historical = await self._async_check_has_historical_data()
+                self._checked_for_historical_data = True
+                if has_historical:
+                    self._historical_data_fetched = True
+                    self.logger.info(
+                        "Historical data already present in database - skipping fetch"
+                    )
+
+            # Fetch historical data on first run (if not already in database)
             if not self._historical_data_fetched:
                 self.logger.debug("First run - fetching historical data")
-                await self._async_fetch_historical_data()
-                self._historical_data_fetched = True
+                try:
+                    await self._async_fetch_historical_data()
+                    self._historical_data_fetched = True
+                    # Set backfill date to now to avoid re-fetching the same data
+                    self._last_backfill_date = datetime.now()
+                    self.logger.info("Historical data fetch completed successfully")
+                except Exception as err:
+                    self.logger.warning(
+                        "Historical data fetch failed, continuing with current data only: %s",
+                        err,
+                    )
+                    # Don't set _historical_data_fetched to True so we retry next time
+                    # But continue with the update to provide current data
 
             # Perform backfilling if needed (30-day lookback)
-            await self._async_backfill_missing_data()
+            # Skip if we just did a historical fetch to avoid duplicate/overlapping data
+            try:
+                await self._async_backfill_missing_data()
+            except Exception as err:
+                self.logger.warning(
+                    "Data backfilling failed, continuing with available data: %s", err
+                )
 
             # Calculate billing period dates (SFPUC bills ~25th of each month)
             bill_start, bill_end = self._calculate_billing_period()
@@ -586,23 +695,59 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 bill_end.date(),
             )
 
-            # Fetch usage for current billing period (accumulated since last bill date)
+            # Use statistics data to get current billing period usage
+            # This provides real-time updates from already-inserted hourly/daily data
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.statistics import (
+                statistics_during_period,
+            )
+
             self.logger.debug(
-                "Fetching current billing period usage data from %s to %s",
+                "Calculating current billing period usage from statistics (%s to %s)",
                 bill_start.date(),
                 datetime.now().date(),
             )
-            period_data = await loop.run_in_executor(
-                None, self.scraper.get_usage_data, bill_start, datetime.now(), "daily"
+
+            # Get daily statistics for the current billing period
+            safe_account = (
+                self.config_entry.data.get(CONF_USERNAME, "unknown")
+                .replace("-", "_")
+                .lower()
             )
-            current_bill_usage = (
-                sum(item["usage"] for item in period_data) if period_data else 0
-            )
-            self.logger.debug(
-                "Calculated current billing period usage: %.2f gallons from %d daily readings",
-                current_bill_usage,
-                len(period_data) if period_data else 0,
-            )
+            stat_id = f"{DOMAIN}:{safe_account}_water_daily_consumption"
+
+            try:
+                # Fetch statistics from bill_start to now
+                stats = await get_instance(self.hass).async_add_executor_job(
+                    statistics_during_period,
+                    self.hass,
+                    dt_util.as_utc(bill_start),
+                    dt_util.as_utc(datetime.now()),
+                    {stat_id},
+                    "day",
+                    None,
+                    {"state"},
+                )
+
+                if stats and stat_id in stats:
+                    # Sum all daily usage values in the billing period
+                    current_bill_usage = sum(
+                        float(stat.get("state", 0)) for stat in stats[stat_id]
+                    )
+                    self.logger.debug(
+                        "Calculated current billing period usage from statistics: %.2f gallons from %d days",
+                        current_bill_usage,
+                        len(stats[stat_id]),
+                    )
+                else:
+                    self.logger.warning(
+                        "No statistics found for current billing period"
+                    )
+                    current_bill_usage = 0
+
+            except Exception as err:
+                self.logger.error("Failed to calculate usage from statistics: %s", err)
+                current_bill_usage = 0
 
             # Return simplified data for the single sensor
             data = {
@@ -610,23 +755,22 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "last_updated": datetime.now(),
             }
 
-            # Insert current statistics (daily data for the current period)
-            if period_data:
-                self.logger.debug("Inserting current period statistics")
-                await self._async_insert_statistics(period_data)
-
             self.logger.info(
                 "Data update completed successfully - Current billing period usage: %.2f gallons",
                 current_bill_usage,
             )
             return data
 
+        except UpdateFailed:
+            # Re-raise UpdateFailed exceptions as-is
+            raise
         except Exception as err:
             self.logger.error(
-                "Error updating San Francisco Water Power Sewer data: %s", err
+                "Unexpected error updating San Francisco Water Power Sewer data: %s",
+                err,
             )
             raise UpdateFailed(
-                f"Error updating San Francisco Water Power Sewer data: {err}"
+                f"Unexpected error updating San Francisco Water Power Sewer data: {err}"
             ) from err
 
     async def _async_fetch_historical_data(self) -> None:
@@ -652,45 +796,87 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Fetch monthly billed usage data - all available history
             self.logger.info("Fetching monthly billed usage data...")
-            # SFPUC typically has 2+ years of billing history
-            start_date = end_date - timedelta(days=730)  # 2 years back
-            monthly_data = await loop.run_in_executor(
-                None, self.scraper.get_usage_data, start_date, end_date, "monthly"
-            )
-            if monthly_data:
-                await self._async_insert_statistics(monthly_data)
-                self.logger.info(
-                    "Fetched %d monthly billing data points", len(monthly_data)
+            try:
+                # SFPUC typically has 2+ years of billing history
+                start_date = end_date - timedelta(days=730)  # 2 years back
+                monthly_data = await loop.run_in_executor(
+                    None, self.scraper.get_usage_data, start_date, end_date, "monthly"
                 )
-            else:
-                self.logger.warning("No monthly billing data retrieved")
+                if monthly_data:
+                    await self._async_insert_statistics(monthly_data)
+                    self.logger.info(
+                        "Fetched %d monthly billing data points", len(monthly_data)
+                    )
+                else:
+                    self.logger.warning("No monthly billing data retrieved")
+            except Exception as err:
+                self.logger.warning("Failed to fetch monthly billing data: %s", err)
 
             # Fetch daily data for the past 2 years (comprehensive historical data)
-            self.logger.debug(
-                "Fetching daily data from %s to %s", start_date.date(), end_date.date()
-            )
-            daily_data = await loop.run_in_executor(
-                None, self.scraper.get_usage_data, start_date, end_date, "daily"
-            )
-            if daily_data:
-                await self._async_insert_statistics(daily_data)
-                self.logger.info("Fetched %d daily data points", len(daily_data))
-            else:
-                self.logger.warning("No daily data retrieved")
+            # SFPUC limits daily data downloads to ~7-10 days, so we fetch in chunks
+            self.logger.info("Fetching daily data in chunks...")
+            try:
+                all_daily_data = []
+                chunk_days = 7  # Fetch 7 days at a time
+                current_end = end_date
+                start_date_2yr = end_date - timedelta(days=730)  # 2 years back
+
+                while current_end > start_date_2yr:
+                    chunk_start = max(
+                        current_end - timedelta(days=chunk_days), start_date_2yr
+                    )
+                    self.logger.debug(
+                        "Fetching daily chunk from %s to %s",
+                        chunk_start.date(),
+                        current_end.date(),
+                    )
+
+                    chunk_data = await loop.run_in_executor(
+                        None,
+                        self.scraper.get_usage_data,
+                        chunk_start,
+                        current_end,
+                        "daily",
+                    )
+
+                    if chunk_data:
+                        all_daily_data.extend(chunk_data)
+                        self.logger.debug(
+                            "Chunk returned %d data points", len(chunk_data)
+                        )
+
+                    current_end = chunk_start - timedelta(days=1)
+                    # Small delay to avoid overwhelming the server
+                    await asyncio.sleep(0.5)
+
+                if all_daily_data:
+                    await self._async_insert_statistics(all_daily_data)
+                    self.logger.info(
+                        "Fetched %d daily data points total", len(all_daily_data)
+                    )
+                else:
+                    self.logger.warning("No daily data retrieved")
+            except Exception as err:
+                self.logger.warning("Failed to fetch daily data: %s", err)
 
             # Fetch hourly data for the past 30 days (most detailed recent data)
-            start_date = end_date - timedelta(days=30)
-            self.logger.debug(
-                "Fetching hourly data from %s to %s", start_date.date(), end_date.date()
-            )
-            hourly_data = await loop.run_in_executor(
-                None, self.scraper.get_usage_data, start_date, end_date, "hourly"
-            )
-            if hourly_data:
-                await self._async_insert_statistics(hourly_data)
-                self.logger.info("Fetched %d hourly data points", len(hourly_data))
-            else:
-                self.logger.warning("No hourly data retrieved")
+            try:
+                start_date = end_date - timedelta(days=30)
+                self.logger.debug(
+                    "Fetching hourly data from %s to %s",
+                    start_date.date(),
+                    end_date.date(),
+                )
+                hourly_data = await loop.run_in_executor(
+                    None, self.scraper.get_usage_data, start_date, end_date, "hourly"
+                )
+                if hourly_data:
+                    await self._async_insert_statistics(hourly_data)
+                    self.logger.info("Fetched %d hourly data points", len(hourly_data))
+                else:
+                    self.logger.warning("No hourly data retrieved")
+            except Exception as err:
+                self.logger.warning("Failed to fetch hourly data: %s", err)
 
         except Exception as err:
             self.logger.warning("Failed to fetch historical data: %s", err)
@@ -725,21 +911,35 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             loop = asyncio.get_event_loop()
 
             # Check for missing daily data in the lookback period
-            daily_data = await loop.run_in_executor(
-                None, self.scraper.get_usage_data, lookback_date, now, "daily"
-            )
-            if daily_data:
-                await self._async_insert_statistics(daily_data)
-                self.logger.debug("Backfilled %d daily data points", len(daily_data))
+            try:
+                daily_data = await loop.run_in_executor(
+                    None, self.scraper.get_usage_data, lookback_date, now, "daily"
+                )
+                if daily_data:
+                    await self._async_insert_statistics(daily_data)
+                    self.logger.debug(
+                        "Backfilled %d daily data points", len(daily_data)
+                    )
+                else:
+                    self.logger.debug("No daily data found for backfilling")
+            except Exception as err:
+                self.logger.warning("Failed to backfill daily data: %s", err)
 
             # Check for missing hourly data in the recent past (last 7 days)
-            recent_start = now - timedelta(days=7)
-            hourly_data = await loop.run_in_executor(
-                None, self.scraper.get_usage_data, recent_start, now, "hourly"
-            )
-            if hourly_data:
-                await self._async_insert_statistics(hourly_data)
-                self.logger.debug("Backfilled %d hourly data points", len(hourly_data))
+            try:
+                recent_start = now - timedelta(days=7)
+                hourly_data = await loop.run_in_executor(
+                    None, self.scraper.get_usage_data, recent_start, now, "hourly"
+                )
+                if hourly_data:
+                    await self._async_insert_statistics(hourly_data)
+                    self.logger.debug(
+                        "Backfilled %d hourly data points", len(hourly_data)
+                    )
+                else:
+                    self.logger.debug("No hourly data found for backfilling")
+            except Exception as err:
+                self.logger.warning("Failed to backfill hourly data: %s", err)
 
             self._last_backfill_date = now
 
@@ -834,34 +1034,38 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "Inserting %d %s statistics", len(data_points), resolution
             )
 
+            # Sort data points by timestamp to ensure correct cumulative sum calculation
+            data_points = sorted(data_points, key=lambda x: x["timestamp"])
+
+            # Deduplicate by timestamp (keep last occurrence to get most recent data)
+            seen_timestamps = {}
+            for point in data_points:
+                timestamp_key = point["timestamp"]
+                seen_timestamps[timestamp_key] = point
+
+            # Convert back to list, maintaining sorted order
+            data_points = list(seen_timestamps.values())
+            data_points.sort(key=lambda x: x["timestamp"])
+
+            self.logger.debug(
+                "After deduplication: %d %s statistics", len(data_points), resolution
+            )
+
             # Create statistic metadata based on resolution
+            # Include account number in statistic ID for multi-account support
+            account_number = self.config_entry.data.get(CONF_USERNAME, "default")
+            # Sanitize account number (lowercase, replace special chars)
+            safe_account = account_number.lower().replace("-", "_").replace(" ", "_")
+
             if resolution == "hourly":
-                # Include account number in statistic ID for multi-account support
-                account_number = self.config_entry.data.get(CONF_USERNAME, "default")
-                # Sanitize account number (lowercase, replace special chars)
-                safe_account = (
-                    account_number.lower().replace("-", "_").replace(" ", "_")
-                )
                 stat_id = f"{DOMAIN}:{safe_account}_water_hourly_consumption"
                 name = "San Francisco Water Power Sewer Hourly Usage"
                 has_sum = True
             elif resolution == "daily":
-                # Include account number in statistic ID for multi-account support
-                account_number = self.config_entry.data.get(CONF_USERNAME, "default")
-                # Sanitize account number (lowercase, replace special chars)
-                safe_account = (
-                    account_number.lower().replace("-", "_").replace(" ", "_")
-                )
                 stat_id = f"{DOMAIN}:{safe_account}_water_daily_consumption"
                 name = "San Francisco Water Power Sewer Daily Usage"
                 has_sum = True
             elif resolution == "monthly":
-                # Include account number in statistic ID for multi-account support
-                account_number = self.config_entry.data.get(CONF_USERNAME, "default")
-                # Sanitize account number (lowercase, replace special chars)
-                safe_account = (
-                    account_number.lower().replace("-", "_").replace(" ", "_")
-                )
                 stat_id = f"{DOMAIN}:{safe_account}_water_monthly_consumption"
                 name = "San Francisco Water Power Sewer Monthly Billed Usage"
                 has_sum = True
@@ -869,18 +1073,19 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.logger.error("Unknown resolution for statistics: %s", resolution)
                 return
 
-            metadata = StatisticMetaData(  # type: ignore[typeddict-item]
+            metadata = StatisticMetaData(
                 has_mean=False,
                 has_sum=has_sum,
-                mean_type=StatisticMeanType.NONE,
                 name=name,
                 source=DOMAIN,
                 statistic_id=stat_id,
-                unit_of_measurement=UnitOfVolume.GALLONS,
+                unit_of_measurement=UnitOfVolume.GALLONS.value,
             )
 
             # Create statistic data points
             statistic_data = []
+            cumulative_sum = 0.0  # Track cumulative sum for Energy Dashboard
+
             for point in data_points:
                 timestamp = point["timestamp"]
                 usage = point["usage"]
@@ -897,17 +1102,29 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         day=1, hour=0, minute=0, second=0, microsecond=0
                     )
 
-                # Convert naive timestamp to timezone-aware (assume PST/PDT for SF)
+                # Convert naive timestamp to timezone-aware UTC (HA stores statistics in UTC)
                 if start_time.tzinfo is None:
-                    # Use America/Los_Angeles timezone for San Francisco
-                    sf_timezone = dt_util.get_time_zone("America/Los_Angeles")
-                    start_time = start_time.replace(tzinfo=sf_timezone)
+                    # Treat naive timestamp as San Francisco local time
+                    # Localize to SF timezone, then convert to UTC
+                    import zoneinfo
+
+                    sf_timezone = zoneinfo.ZoneInfo("America/Los_Angeles")
+                    # Create a new aware datetime by interpreting the naive time as SF local time
+                    start_time_aware = start_time.replace(tzinfo=sf_timezone)
+                    # Convert to UTC
+                    start_time = dt_util.as_utc(start_time_aware)
+                else:
+                    # Already timezone-aware, convert to UTC
+                    start_time = dt_util.as_utc(start_time)
+
+                # Accumulate sum for Energy Dashboard compatibility
+                cumulative_sum += usage
 
                 statistic_data.append(
                     StatisticData(
                         start=start_time,
-                        state=usage,
-                        sum=usage,
+                        state=usage,  # Individual period usage
+                        sum=cumulative_sum,  # Cumulative total for Energy Dashboard
                     )
                 )
 
@@ -928,7 +1145,12 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.logger.debug("Successfully inserted %s statistics", resolution)
 
         except Exception as err:
-            self.logger.warning("Failed to insert %s statistics: %s", resolution, err)
+            self.logger.warning(
+                "Failed to insert %s statistics for account %s: %s",
+                resolution,
+                self.config_entry.data.get(CONF_USERNAME, "unknown")[:3] + "***",
+                err,
+            )
 
     async def _async_insert_legacy_statistics(self, daily_usage: float) -> None:
         """Insert legacy daily statistics (backward compatibility).
@@ -947,10 +1169,9 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             account_number = self.config_entry.data.get(CONF_USERNAME, "default")
             # Sanitize account number (lowercase, replace special chars)
             safe_account = account_number.lower().replace("-", "_").replace(" ", "_")
-            metadata = StatisticMetaData(  # type: ignore[typeddict-item]
+            metadata = StatisticMetaData(
                 has_mean=False,
                 has_sum=True,
-                mean_type=StatisticMeanType.NONE,
                 name="San Francisco Water Power Sewer Daily Usage",
                 source=DOMAIN,
                 statistic_id=f"{DOMAIN}:{safe_account}_water_daily_consumption",
@@ -983,5 +1204,7 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         except Exception as err:
             self.logger.warning(
-                "Failed to insert legacy water usage statistics: %s", err
+                "Failed to insert legacy water usage statistics for account %s: %s",
+                self.config_entry.data.get(CONF_USERNAME, "unknown")[:3] + "***",
+                err,
             )

@@ -82,12 +82,18 @@ class SFWaterSensor(CoordinatorEntity[SFWaterCoordinator], SensorEntity):
         # Generate unique_id that creates the proper entity_id
         account_number = coordinator.config_entry.data.get(CONF_USERNAME, "unknown")
         self._attr_unique_id = f"water_account_{account_number}_{description.key}"
+        # Mask account number for device info (show last 4 characters)
+        masked_account = (
+            f"****{account_number[-4:]}" if len(account_number) > 4 else account_number
+        )
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, config_entry.entry_id)},
             manufacturer="SFPUC",
             model="Water Usage",
             name="San Francisco Water Power Sewer",
+            sw_version=masked_account,
+            configuration_url="https://myaccount-water.sfpuc.org",
         )
 
     @property
