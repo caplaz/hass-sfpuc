@@ -17,14 +17,8 @@ from .data_fetcher import (
     async_backfill_missing_data,
     async_background_historical_fetch,
     async_check_has_historical_data,
-    async_fetch_historical_data,
 )
 from .scraper import SFPUCScraper
-from .statistics_handler import (
-    async_insert_legacy_statistics,
-    async_insert_resolution_statistics,
-    async_insert_statistics,
-)
 from .utils import async_detect_billing_day, calculate_billing_period
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,35 +71,6 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._checked_for_historical_data = False
         self._billing_day: int | None = None  # Detected billing day from monthly data
 
-    async def _async_detect_billing_day(self) -> int:
-        """Detect billing day from monthly statistics.
-
-        Analyzes monthly billing data to determine the billing cycle day.
-        Falls back to default of 25th if detection fails.
-
-        Returns:
-            Billing day of month (1-31)
-        """
-        return await async_detect_billing_day(self)
-
-    def _calculate_billing_period(self) -> tuple[datetime, datetime]:
-        """Calculate current SFPUC billing period dates.
-
-        Uses billing day detected from monthly data, or defaults to 25th.
-
-        Returns:
-            Tuple of (bill_start_date, bill_end_date)
-        """
-        return calculate_billing_period(self)
-
-    async def _async_check_has_historical_data(self) -> bool:
-        """Check if we already have sufficient historical data in the database.
-
-        Returns True if we have daily statistics going back at least 1 year.
-        This prevents re-fetching 2 years of data on every HA restart.
-        """
-        return await async_check_has_historical_data(self)
-
     def update_credentials(self, username: str, password: str) -> None:
         """Update the scraper credentials.
 
@@ -154,7 +119,7 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Check if we need to fetch historical data
             # Only check once per HA session to avoid repeated database queries
             if not self._checked_for_historical_data:
-                has_historical = await self._async_check_has_historical_data()
+                has_historical = await async_check_has_historical_data(self)
                 self._checked_for_historical_data = True
                 if has_historical:
                     self._historical_data_fetched = True
@@ -166,12 +131,12 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Run in background to avoid blocking startup
             if not self._historical_data_fetched:
                 self.logger.info("Scheduling historical data fetch in background...")
-                asyncio.create_task(self._async_background_historical_fetch())
+                asyncio.create_task(async_background_historical_fetch(self))
 
             # Detect billing day from monthly data (if not already detected)
             if self._billing_day is None:
                 try:
-                    await self._async_detect_billing_day()
+                    await async_detect_billing_day(self)
                 except Exception as err:
                     self.logger.warning(
                         "Failed to detect billing day, will use default: %s", err
@@ -180,14 +145,14 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Perform backfilling if needed (30-day lookback)
             # Skip if we just did a historical fetch to avoid duplicate/overlapping data
             try:
-                await self._async_backfill_missing_data()
+                await async_backfill_missing_data(self)
             except Exception as err:
                 self.logger.warning(
                     "Data backfilling failed, continuing with available data: %s", err
                 )
 
             # Calculate billing period dates (SFPUC bills ~25th of each month)
-            bill_start, bill_end = self._calculate_billing_period()
+            bill_start, bill_end = calculate_billing_period(self)
             self.logger.debug(
                 "Current billing period: %s to %s",
                 bill_start.date(),
@@ -271,96 +236,3 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed(
                 f"Unexpected error updating San Francisco Water Power Sewer data: {err}"
             ) from err
-
-    async def _async_fetch_historical_data(self) -> None:
-        """Fetch historical data going back months/years on first run.
-
-        Populates recorder statistics with:
-        - Monthly billed usage data for the past 2 years (billing cycle data)
-        - Daily usage data for the past 2 years (comprehensive historical data)
-        - Hourly usage data for the past 30 days (most detailed recent data)
-
-        Monthly data represents actual billing periods (typically 25th-25th)
-        and provides valuable year-over-year comparison data.
-
-        Logs warnings if data retrieval fails but does not raise exceptions
-        to avoid blocking the initial coordinator setup.
-
-        NOTE: This method is now scheduled to run in the background after
-        initial setup to avoid blocking Home Assistant startup.
-        """
-        return await async_fetch_historical_data(self)
-
-    async def _async_background_historical_fetch(self) -> None:
-        """Fetch historical data in background after startup.
-
-        This method runs the historical data fetch process in the background
-        to avoid blocking Home Assistant startup. It waits 30 seconds after
-        startup before beginning to allow HA to fully initialize.
-        """
-        return await async_background_historical_fetch(self)
-
-    async def _async_backfill_missing_data(self) -> None:
-        """Backfill missing data with 30-day lookback window.
-
-        Runs daily to ensure complete historical data in recorder by:
-        1. Checking for missing daily data in the past 30 days
-        2. Checking for missing hourly data in the past 7 days
-        3. Inserting any missing data points into statistics
-
-        Throttled to run at most once per 24 hours to avoid excessive
-        API calls to SFPUC portal.
-
-        Logs warnings if backfilling fails but does not raise exceptions.
-        """
-        return await async_backfill_missing_data(self)
-
-    async def _async_insert_statistics(
-        self, usage_data: float | list[dict[str, Any]]
-    ) -> None:
-        """Insert water usage statistics into Home Assistant.
-
-        Handles both legacy (float) and new (list) data formats.
-        Groups data points by resolution and delegates to appropriate
-        resolution-specific insertion methods.
-
-        Args:
-            usage_data: Either a float representing daily usage (legacy format)
-                       or a list of dictionaries containing 'timestamp', 'usage',
-                       and 'resolution' keys.
-
-        Logs warnings if insertion fails but does not raise exceptions.
-        """
-        return await async_insert_statistics(self, usage_data)
-
-    async def _async_insert_resolution_statistics(
-        self, data_points: list[dict[str, Any]], resolution: str
-    ) -> None:
-        """Insert statistics for a specific resolution.
-
-        Creates StatisticMetaData and StatisticData objects and adds them
-        to Home Assistant's recorder component. Handles timezone conversion
-        for San Francisco (America/Los_Angeles).
-
-        Args:
-            data_points: List of dictionaries with 'timestamp' and 'usage' keys.
-                        Timestamps should be timezone-naive (assumed local to SF).
-            resolution: Data resolution - 'hourly' or 'daily'. Determines statistic ID
-                       and metadata.
-
-        Logs warnings if insertion fails but does not raise exceptions.
-        """
-        return await async_insert_resolution_statistics(self, data_points, resolution)
-
-    async def _async_insert_legacy_statistics(self, daily_usage: float) -> None:
-        """Insert legacy daily statistics (backward compatibility).
-
-        Creates a single daily statistic data point for the current day.
-        Used when legacy data format (float) is provided to _async_insert_statistics.
-
-        Args:
-            daily_usage: Total water usage for the day in gallons.
-
-        Logs warnings if insertion fails but does not raise exceptions.
-        """
-        return await async_insert_legacy_statistics(self, daily_usage)

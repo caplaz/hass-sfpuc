@@ -214,7 +214,7 @@ async def async_insert_legacy_statistics(coordinator, daily_usage: float) -> Non
     """Insert legacy daily statistics (backward compatibility).
 
     Creates a single daily statistic data point for the current day.
-    Used when legacy data format (float) is provided to _async_insert_statistics.
+    Used when legacy data format (float) is provided to async_insert_statistics.
 
     Args:
         daily_usage: Total water usage for the day in gallons.

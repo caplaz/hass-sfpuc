@@ -274,44 +274,23 @@ class SFPUCScraper:
 
                                 # Parse timestamp based on resolution
                                 if resolution == "hourly":
-                                    # Try multiple formats for hourly data
-                                    timestamp = None
-                                    # First try full datetime format (for tests)
+                                    # SFPUC hourly format: "12 AM", "1 PM", etc.
                                     try:
-                                        timestamp = datetime.strptime(
-                                            timestamp_str, "%m/%d/%Y %H:%M:%S"
+                                        hour_str, am_pm = timestamp_str.split()
+                                        am_pm = am_pm.upper()
+                                        hour = int(hour_str)
+                                        if am_pm == "PM" and hour != 12:
+                                            hour += 12
+                                        elif am_pm == "AM" and hour == 12:
+                                            hour = 0
+                                        # Use the requested end_date for hourly data
+                                        # SFPUC typically shows hourly data up to 2 days ago
+                                        request_date = end_date.date()
+                                        timestamp = datetime.combine(
+                                            request_date,
+                                            datetime.min.time().replace(hour=hour),
                                         )
-                                    except ValueError:
-                                        pass
-
-                                    # If that fails, try AM/PM format without date (real SFPUC format)
-                                    if timestamp is None:
-                                        try:
-                                            # Handle AM/PM format like "12 AM", "1 PM"
-                                            if timestamp_str.upper().endswith(
-                                                " AM"
-                                            ) or timestamp_str.upper().endswith(" PM"):
-                                                hour_str = timestamp_str.split()[0]
-                                                am_pm = timestamp_str.split()[1].upper()
-                                                hour = int(hour_str)
-                                                if am_pm == "PM" and hour != 12:
-                                                    hour += 12
-                                                elif am_pm == "AM" and hour == 12:
-                                                    hour = 0
-                                                # Use the requested end_date for hourly data
-                                                # SFPUC typically shows hourly data up to 2 days ago
-                                                # Use end_date from the request instead of assuming today
-                                                request_date = end_date.date()
-                                                timestamp = datetime.combine(
-                                                    request_date,
-                                                    datetime.min.time().replace(
-                                                        hour=hour
-                                                    ),
-                                                )
-                                        except (ValueError, IndexError):
-                                            pass
-
-                                    if timestamp is None:
+                                    except (ValueError, IndexError):
                                         _LOGGER.debug(
                                             "Failed to parse hourly timestamp: %s",
                                             timestamp_str,
@@ -319,55 +298,31 @@ class SFPUCScraper:
                                         continue
 
                                 elif resolution == "daily":
-                                    # Try multiple formats for daily data
-                                    timestamp = None
-                                    # First try full date format (for tests)
+                                    # SFPUC daily format: "MM/DD" (no year)
                                     try:
-                                        timestamp = datetime.strptime(
-                                            timestamp_str, "%m/%d/%Y"
-                                        )
-                                    except ValueError:
-                                        pass
+                                        month, day = map(int, timestamp_str.split("/"))
+                                        # Infer year from requested date range
+                                        requested_year = start_date.year
+                                        timestamp = datetime(requested_year, month, day)
 
-                                    # If that fails, try MM/DD format without year (real SFPUC format)
-                                    # Use the year from the requested start_date to avoid defaulting to current year
-                                    if timestamp is None:
-                                        try:
-                                            month, day = map(
-                                                int, timestamp_str.split("/")
-                                            )
-                                            # Infer year from requested date range
-                                            # If the month is near the end of year and we're requesting data
-                                            # that spans year boundaries, we need to handle the year transition
-                                            requested_year = start_date.year
+                                        # Handle year boundaries for cross-year requests
+                                        if (
+                                            timestamp < start_date
+                                            and start_date.month == 12
+                                            and month == 1
+                                        ):
                                             timestamp = datetime(
-                                                requested_year, month, day
+                                                requested_year + 1, month, day
                                             )
-
-                                            # Handle year boundaries: if parsed date is before start_date
-                                            # and we're in December/January, it might be next year
-                                            if (
-                                                timestamp < start_date
-                                                and start_date.month == 12
-                                                and month == 1
-                                            ):
-                                                timestamp = datetime(
-                                                    requested_year + 1, month, day
-                                                )
-                                            # Or if parsed date is after end_date and we're crossing into
-                                            # previous year (Jan requesting Dec data)
-                                            elif (
-                                                timestamp > end_date
-                                                and end_date.month == 1
-                                                and month == 12
-                                            ):
-                                                timestamp = datetime(
-                                                    requested_year - 1, month, day
-                                                )
-                                        except (ValueError, IndexError):
-                                            pass
-
-                                    if timestamp is None:
+                                        elif (
+                                            timestamp > end_date
+                                            and end_date.month == 1
+                                            and month == 12
+                                        ):
+                                            timestamp = datetime(
+                                                requested_year - 1, month, day
+                                            )
+                                    except (ValueError, IndexError):
                                         _LOGGER.debug(
                                             "Failed to parse daily timestamp: %s",
                                             timestamp_str,
@@ -375,32 +330,17 @@ class SFPUCScraper:
                                         continue
 
                                 elif resolution == "monthly":
-                                    # Try multiple formats for monthly data
-                                    timestamp = None
-                                    # First try MM/YYYY format (for tests)
+                                    # SFPUC monthly format: "Mon YY" (like "Dec 23")
                                     try:
-                                        timestamp = datetime.strptime(
-                                            timestamp_str, "%m/%Y"
-                                        )
-                                    except ValueError:
-                                        pass
-
-                                    # If that fails, try "Mon YY" format (real SFPUC format like "Dec 23")
-                                    if timestamp is None:
-                                        try:
-                                            # Parse "Dec 23" format - month abbreviation and 2-digit year
-                                            month_name, year_str = timestamp_str.split()
-                                            # Convert month name to number
-                                            month = datetime.strptime(
-                                                month_name, "%b"
-                                            ).month
-                                            # Convert 2-digit year to 4-digit (assuming 2000s)
-                                            year = 2000 + int(year_str)
-                                            timestamp = datetime(year, month, 1)
-                                        except (ValueError, IndexError):
-                                            pass
-
-                                    if timestamp is None:
+                                        month_name, year_str = timestamp_str.split()
+                                        month = datetime.strptime(
+                                            month_name, "%b"
+                                        ).month
+                                        year = 2000 + int(
+                                            year_str
+                                        )  # Convert 2-digit to 4-digit
+                                        timestamp = datetime(year, month, 1)
+                                    except (ValueError, IndexError):
                                         _LOGGER.debug(
                                             "Failed to parse monthly timestamp: %s",
                                             timestamp_str,

@@ -104,9 +104,7 @@ class TestSFPUCScraper:
         download_response.url = (
             "https://myaccount-water.sfpuc.org/TRANSACTIONS_EXCEL_DOWNLOAD.aspx"
         )
-        download_response.content = (
-            b"Date\tUsage\n10/01/2023 10:00:00\t50.5\n10/01/2023 11:00:00\t45.2\n"
-        )
+        download_response.content = b"Date\tUsage\n7 AM\t50.5\n8 AM\t45.2\n"
         mock_post.return_value = download_response
 
         start_date = datetime(2023, 10, 1)
@@ -116,10 +114,16 @@ class TestSFPUCScraper:
 
         assert result is not None
         assert len(result) == 2
-        assert result[0]["timestamp"] == datetime(2023, 10, 1, 10, 0, 0)
+        # Should use the requested end_date for timestamps
+        request_date = end_date.date()
+        assert result[0]["timestamp"] == datetime.combine(
+            request_date, datetime.min.time().replace(hour=7)
+        )
         assert result[0]["usage"] == 50.5
         assert result[0]["resolution"] == "hourly"
-        assert result[1]["timestamp"] == datetime(2023, 10, 1, 11, 0, 0)
+        assert result[1]["timestamp"] == datetime.combine(
+            request_date, datetime.min.time().replace(hour=8)
+        )
         assert result[1]["usage"] == 45.2
 
     @patch("requests.Session.get")
@@ -142,9 +146,7 @@ class TestSFPUCScraper:
         download_response.url = (
             "https://myaccount-water.sfpuc.org/TRANSACTIONS_EXCEL_DOWNLOAD.aspx"
         )
-        download_response.content = (
-            b"Date\tUsage\n10/01/2023\t150.5\n10/02/2023\t145.2\n"
-        )
+        download_response.content = b"Date\tUsage\n10/01\t150.5\n10/02\t145.2\n"
         mock_post.return_value = download_response
 
         start_date = datetime(2023, 10, 1)
@@ -154,9 +156,12 @@ class TestSFPUCScraper:
 
         assert result is not None
         assert len(result) == 2
+        # Should use the requested year for timestamps
         assert result[0]["timestamp"] == datetime(2023, 10, 1)
         assert result[0]["usage"] == 150.5
         assert result[0]["resolution"] == "daily"
+        assert result[1]["timestamp"] == datetime(2023, 10, 2)
+        assert result[1]["usage"] == 145.2
 
     @patch("requests.Session.get")
     @patch("requests.Session.post")
@@ -178,7 +183,7 @@ class TestSFPUCScraper:
         download_response.url = (
             "https://myaccount-water.sfpuc.org/TRANSACTIONS_EXCEL_DOWNLOAD.aspx"
         )
-        download_response.content = b"Date\tUsage\n10/2023\t4500.5\n11/2023\t4200.2\n"
+        download_response.content = b"Date\tUsage\nOct 23\t4500.5\nNov 23\t4200.2\n"
         mock_post.return_value = download_response
 
         start_date = datetime(2023, 10, 1)
@@ -188,9 +193,12 @@ class TestSFPUCScraper:
 
         assert result is not None
         assert len(result) == 2
+        # Should parse "Oct 23" as 2023-10-01 and "Nov 23" as 2023-11-01
         assert result[0]["timestamp"] == datetime(2023, 10, 1)
         assert result[0]["usage"] == 4500.5
         assert result[0]["resolution"] == "monthly"
+        assert result[1]["timestamp"] == datetime(2023, 11, 1)
+        assert result[1]["usage"] == 4200.2
 
     @patch("requests.Session.get")
     @patch("requests.Session.post")

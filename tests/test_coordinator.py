@@ -63,13 +63,18 @@ class TestSFWaterCoordinator:
             patch(
                 "custom_components.sfpuc.statistics_handler.async_add_external_statistics"
             ),
-            patch.object(
-                coordinator, "_async_backfill_missing_data", return_value=None
+            patch(
+                "custom_components.sfpuc.coordinator.async_backfill_missing_data",
+                AsyncMock(),
             ),
-            patch.object(
-                coordinator, "_async_check_has_historical_data", return_value=False
+            patch(
+                "custom_components.sfpuc.coordinator.async_check_has_historical_data",
+                AsyncMock(return_value=False),
             ),
-            patch.object(coordinator, "_async_detect_billing_day", return_value=None),
+            patch(
+                "custom_components.sfpuc.coordinator.async_detect_billing_day",
+                AsyncMock(),
+            ),
         ):
             mock_recorder = Mock()
             mock_recorder.async_add_executor_job = AsyncMock(
@@ -125,13 +130,18 @@ class TestSFWaterCoordinator:
             patch(
                 "custom_components.sfpuc.statistics_handler.async_add_external_statistics"
             ),
-            patch.object(
-                coordinator, "_async_backfill_missing_data", return_value=None
+            patch(
+                "custom_components.sfpuc.coordinator.async_backfill_missing_data",
+                AsyncMock(),
             ),
-            patch.object(
-                coordinator, "_async_check_has_historical_data", return_value=False
+            patch(
+                "custom_components.sfpuc.coordinator.async_check_has_historical_data",
+                AsyncMock(return_value=False),
             ),
-            patch.object(coordinator, "_async_detect_billing_day", return_value=None),
+            patch(
+                "custom_components.sfpuc.coordinator.async_detect_billing_day",
+                AsyncMock(),
+            ),
         ):
             mock_recorder = Mock()
             mock_recorder.async_add_executor_job = AsyncMock(

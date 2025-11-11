@@ -8,6 +8,7 @@ from homeassistant.components.recorder.statistics import statistics_during_perio
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_USERNAME, DOMAIN
+from .statistics_handler import async_insert_statistics
 
 
 async def async_check_has_historical_data(coordinator) -> bool:
@@ -90,7 +91,7 @@ async def async_fetch_historical_data(coordinator) -> None:
                 "monthly",
             )
             if monthly_data:
-                await coordinator._async_insert_statistics(monthly_data)
+                await async_insert_statistics(coordinator, monthly_data)
                 coordinator.logger.info(
                     "Fetched %d monthly billing data points", len(monthly_data)
                 )
@@ -137,7 +138,7 @@ async def async_fetch_historical_data(coordinator) -> None:
                 await asyncio.sleep(0.5)
 
             if all_daily_data:
-                await coordinator._async_insert_statistics(all_daily_data)
+                await async_insert_statistics(coordinator, all_daily_data)
                 coordinator.logger.info(
                     "Fetched %d daily data points total", len(all_daily_data)
                 )
@@ -186,7 +187,7 @@ async def async_fetch_historical_data(coordinator) -> None:
                 await asyncio.sleep(0.3)
 
             if all_hourly_data:
-                await coordinator._async_insert_statistics(all_hourly_data)
+                await async_insert_statistics(coordinator, all_hourly_data)
                 coordinator.logger.info(
                     "Fetched %d hourly data points total for past 30 days",
                     len(all_hourly_data),
@@ -259,7 +260,7 @@ async def async_backfill_missing_data(coordinator) -> None:
                 None, coordinator.scraper.get_usage_data, lookback_date, now, "daily"
             )
             if daily_data:
-                await coordinator._async_insert_statistics(daily_data)
+                await async_insert_statistics(coordinator, daily_data)
                 coordinator.logger.debug(
                     "Backfilled %d daily data points", len(daily_data)
                 )
@@ -287,7 +288,7 @@ async def async_backfill_missing_data(coordinator) -> None:
                 await asyncio.sleep(0.2)  # Small delay
 
             if all_hourly_data:
-                await coordinator._async_insert_statistics(all_hourly_data)
+                await async_insert_statistics(coordinator, all_hourly_data)
                 coordinator.logger.debug(
                     "Backfilled %d hourly data points", len(all_hourly_data)
                 )
