@@ -9,6 +9,7 @@ The integration provides:
 - Automatic data fetching from SFPUC portal
 - Support for multiple languages (English, Spanish)
 - Integration with Home Assistant Energy dashboard
+- Issue repairs for credential management
 
 Author: caplaz
 License: MIT
@@ -19,12 +20,29 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import ConfigType
 
 from .coordinator import SFWaterCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the San Francisco Water Power Sewer integration.
+
+    This is called when the integration is first loaded.
+
+    Args:
+        hass: Home Assistant instance.
+        config: Home Assistant configuration.
+
+    Returns:
+        True if setup was successful.
+    """
+    # Repairs platform is automatically discovered via manifest.json
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -35,6 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     2. Performing the first data refresh
     3. Storing the coordinator in the config entry
     4. Setting up the sensor platform
+    5. Registering repairs flow for credential issues
 
     Args:
         hass: Home Assistant instance.
@@ -56,8 +75,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug("Creating SFWaterCoordinator")
     coordinator = SFWaterCoordinator(hass, entry)
     _LOGGER.debug("Coordinator created, performing first refresh")
-    await coordinator.async_config_entry_first_refresh()
-    _LOGGER.info("Coordinator initialized successfully")
+
+    try:
+        await coordinator.async_config_entry_first_refresh()
+        _LOGGER.info("Coordinator initialized successfully")
+    except Exception as err:
+        _LOGGER.error("Failed to initialize coordinator: %s", err)
+        raise
 
     # Store coordinator in entry runtime data
     entry.runtime_data = coordinator

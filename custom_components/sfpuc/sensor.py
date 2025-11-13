@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 import logging
-from typing import Any, cast
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -79,13 +79,12 @@ class SFWaterSensor(CoordinatorEntity[SFWaterCoordinator], SensorEntity):
         """
         super().__init__(coordinator)
         self.entity_description = description
-        config_entry = cast(ConfigEntry[Any], coordinator.config_entry)
         # Generate unique_id that creates the proper entity_id
         account_number = coordinator.config_entry.data.get(CONF_USERNAME, "unknown")
         self._attr_unique_id = f"water_account_{account_number}_{description.key}"
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, config_entry.entry_id)},
+            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
             manufacturer="SFPUC",
             model="Water Usage",
             name="San Francisco Water Power Sewer",

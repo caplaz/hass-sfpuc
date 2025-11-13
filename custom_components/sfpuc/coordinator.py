@@ -114,7 +114,27 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             if not login_success:
                 self.logger.error("Failed to login to SF PUC - aborting update")
-                raise UpdateFailed("Failed to login to SF PUC")
+                # Create an issue for invalid credentials
+                from homeassistant.helpers.issue_registry import (
+                    IssueSeverity,
+                    async_create_issue,
+                )
+
+                async_create_issue(
+                    self.hass,
+                    DOMAIN,
+                    "invalid_credentials",
+                    is_fixable=True,
+                    severity=IssueSeverity.ERROR,
+                    translation_key="invalid_credentials",
+                    translation_placeholders={
+                        "account": self.config_entry.data.get("username", "unknown"),
+                    },
+                    data={"entry_id": self.config_entry.entry_id},
+                )
+                raise UpdateFailed(
+                    "Failed to login to SF PUC - credentials may be invalid"
+                )
 
             self.logger.debug("Login successful, proceeding with data fetch")
 
