@@ -105,7 +105,7 @@ async def async_fetch_historical_data(coordinator) -> None:
         coordinator.logger.info("Fetching daily data in chunks...")
         try:
             all_daily_data = []
-            chunk_days = 7  # Fetch 7 days at a time
+            chunk_days = 3  # Fetch 3 days at a time to reduce load
             current_end = end_date
             start_date_2yr = end_date - timedelta(days=730)  # 2 years back
 
@@ -119,13 +119,34 @@ async def async_fetch_historical_data(coordinator) -> None:
                     current_end.date(),
                 )
 
-                chunk_data = await loop.run_in_executor(
-                    None,
-                    coordinator.scraper.get_usage_data,
-                    chunk_start,
-                    current_end,
-                    "daily",
-                )
+                # Retry logic for network errors
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        chunk_data = await loop.run_in_executor(
+                            None,
+                            coordinator.scraper.get_usage_data,
+                            chunk_start,
+                            current_end,
+                            "daily",
+                        )
+                        break  # Success, exit retry loop
+                    except Exception as err:
+                        if attempt < max_retries - 1:
+                            coordinator.logger.warning(
+                                "Failed to fetch daily chunk (attempt %d/%d): %s, retrying...",
+                                attempt + 1,
+                                max_retries,
+                                err,
+                            )
+                            await asyncio.sleep(2**attempt)  # Exponential backoff
+                        else:
+                            coordinator.logger.error(
+                                "Failed to fetch daily chunk after %d attempts: %s",
+                                max_retries,
+                                err,
+                            )
+                            raise  # Re-raise to stop fetching
 
                 if chunk_data:
                     all_daily_data.extend(chunk_data)
@@ -135,7 +156,7 @@ async def async_fetch_historical_data(coordinator) -> None:
 
                 current_end = chunk_start - timedelta(days=1)
                 # Small delay to avoid overwhelming the server
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.0)
 
             if all_daily_data:
                 await async_insert_statistics(coordinator, all_daily_data)
@@ -166,14 +187,38 @@ async def async_fetch_historical_data(coordinator) -> None:
                     fetch_date.date(),
                 )
 
-                # Fetch one day at a time for hourly data
-                hourly_chunk = await loop.run_in_executor(
-                    None,
-                    coordinator.scraper.get_usage_data,
-                    fetch_date,
-                    fetch_date,  # Same day for start and end
-                    "hourly",
-                )
+                # Retry logic for network errors
+                max_retries = 3
+                hourly_chunk = None
+                for attempt in range(max_retries):
+                    try:
+                        # Fetch one day at a time for hourly data
+                        hourly_chunk = await loop.run_in_executor(
+                            None,
+                            coordinator.scraper.get_usage_data,
+                            fetch_date,
+                            fetch_date,  # Same day for start and end
+                            "hourly",
+                        )
+                        break  # Success
+                    except Exception as err:
+                        if attempt < max_retries - 1:
+                            coordinator.logger.warning(
+                                "Failed to fetch hourly data for %s (attempt %d/%d): %s, retrying...",
+                                fetch_date.date(),
+                                attempt + 1,
+                                max_retries,
+                                err,
+                            )
+                            await asyncio.sleep(2**attempt)  # Exponential backoff
+                        else:
+                            coordinator.logger.error(
+                                "Failed to fetch hourly data for %s after %d attempts: %s",
+                                fetch_date.date(),
+                                max_retries,
+                                err,
+                            )
+                            # Continue to next day instead of stopping
 
                 if hourly_chunk:
                     all_hourly_data.extend(hourly_chunk)
@@ -184,7 +229,7 @@ async def async_fetch_historical_data(coordinator) -> None:
                     )
 
                 # Small delay to avoid overwhelming the server
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.5)
 
             if all_hourly_data:
                 await async_insert_statistics(coordinator, all_hourly_data)
@@ -256,9 +301,36 @@ async def async_backfill_missing_data(coordinator) -> None:
 
         # Check for missing daily data in the lookback period
         try:
-            daily_data = await loop.run_in_executor(
-                None, coordinator.scraper.get_usage_data, lookback_date, now, "daily"
-            )
+            # Retry logic for network errors
+            max_retries = 3
+            daily_data = None
+            for attempt in range(max_retries):
+                try:
+                    daily_data = await loop.run_in_executor(
+                        None,
+                        coordinator.scraper.get_usage_data,
+                        lookback_date,
+                        now,
+                        "daily",
+                    )
+                    break  # Success
+                except Exception as err:
+                    if attempt < max_retries - 1:
+                        coordinator.logger.warning(
+                            "Failed to fetch daily backfill data (attempt %d/%d): %s, retrying...",
+                            attempt + 1,
+                            max_retries,
+                            err,
+                        )
+                        await asyncio.sleep(2**attempt)  # Exponential backoff
+                    else:
+                        coordinator.logger.error(
+                            "Failed to fetch daily backfill data after %d attempts: %s",
+                            max_retries,
+                            err,
+                        )
+                        raise
+
             if daily_data:
                 await async_insert_statistics(coordinator, daily_data)
                 coordinator.logger.debug(
@@ -276,16 +348,42 @@ async def async_backfill_missing_data(coordinator) -> None:
             # Fetch hourly data from 2 days ago back to 7 days ago
             for days_offset in range(2, 9):  # 2 days ago to 8 days ago (7 days of data)
                 fetch_date = now - timedelta(days=days_offset)
-                hourly_chunk = await loop.run_in_executor(
-                    None,
-                    coordinator.scraper.get_usage_data,
-                    fetch_date,
-                    fetch_date,  # Same day for start and end
-                    "hourly",
-                )
+
+                # Retry logic for network errors
+                max_retries = 3
+                hourly_chunk = None
+                for attempt in range(max_retries):
+                    try:
+                        hourly_chunk = await loop.run_in_executor(
+                            None,
+                            coordinator.scraper.get_usage_data,
+                            fetch_date,
+                            fetch_date,  # Same day for start and end
+                            "hourly",
+                        )
+                        break  # Success
+                    except Exception as err:
+                        if attempt < max_retries - 1:
+                            coordinator.logger.warning(
+                                "Failed to fetch hourly backfill for %s (attempt %d/%d): %s, retrying...",
+                                fetch_date.date(),
+                                attempt + 1,
+                                max_retries,
+                                err,
+                            )
+                            await asyncio.sleep(2**attempt)  # Exponential backoff
+                        else:
+                            coordinator.logger.error(
+                                "Failed to fetch hourly backfill for %s after %d attempts: %s",
+                                fetch_date.date(),
+                                max_retries,
+                                err,
+                            )
+                            # Continue to next day
+
                 if hourly_chunk:
                     all_hourly_data.extend(hourly_chunk)
-                await asyncio.sleep(0.2)  # Small delay
+                await asyncio.sleep(0.5)  # Small delay
 
             if all_hourly_data:
                 await async_insert_statistics(coordinator, all_hourly_data)

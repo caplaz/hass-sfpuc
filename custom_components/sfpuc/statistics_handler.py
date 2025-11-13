@@ -10,7 +10,7 @@ from homeassistant.components.recorder.models import (
 )
 from homeassistant.components.recorder.statistics import async_add_external_statistics
 from homeassistant.components.recorder.util import DATA_INSTANCE
-from homeassistant.const import VOLUME, UnitOfVolume
+from homeassistant.const import UnitOfVolume
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_USERNAME, DOMAIN
@@ -131,7 +131,7 @@ async def async_insert_resolution_statistics(
         # Sanitize account number (lowercase, replace special chars)
         safe_account = account_number.lower().replace("-", "_").replace(" ", "_")
 
-        # Single unified statistic for all water consumption data
+        # Use a valid statistic_id for external statistics
         stat_id = f"{DOMAIN}:{safe_account}_water_consumption"
         name = "San Francisco Water Power Sewer"
         has_sum = True
@@ -143,7 +143,6 @@ async def async_insert_resolution_statistics(
             name=name,
             source=DOMAIN,
             statistic_id=stat_id,
-            unit_class=VOLUME,
             unit_of_measurement=UnitOfVolume.GALLONS.value,
         )
 
@@ -180,14 +179,15 @@ async def async_insert_resolution_statistics(
                 # Already timezone-aware, convert to UTC
                 start_time = dt_util.as_utc(start_time)
 
-            # Accumulate sum for Energy Dashboard compatibility
+            # Accumulate sum for Energy Dashboard
             cumulative_sum += usage
 
+            # Store both state (period usage) and sum (cumulative total)
             statistic_data.append(
                 StatisticData(
                     start=start_time,
                     state=usage,  # Individual period usage
-                    sum=cumulative_sum,  # Cumulative total for Energy Dashboard
+                    sum=cumulative_sum,  # Cumulative sum required by Energy Dashboard
                 )
             )
 
@@ -240,7 +240,6 @@ async def async_insert_legacy_statistics(coordinator, daily_usage: float) -> Non
             name="San Francisco Water Power Sewer",
             source=DOMAIN,
             statistic_id=f"{DOMAIN}:{safe_account}_water_consumption",
-            unit_class=VOLUME,
             unit_of_measurement=UnitOfVolume.GALLONS,
         )
 
@@ -253,7 +252,6 @@ async def async_insert_legacy_statistics(coordinator, daily_usage: float) -> Non
             StatisticData(
                 start=start_of_day,
                 state=daily_usage,
-                sum=daily_usage,
             )
         ]
 

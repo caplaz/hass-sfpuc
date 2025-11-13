@@ -12,7 +12,6 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
-    SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfVolume
@@ -24,6 +23,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_USERNAME, DOMAIN
 from .coordinator import SFWaterCoordinator
+from .version import __version__
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,7 +49,8 @@ WATER_SENSORS: tuple[SFWaterEntityDescription, ...] = (
         translation_key="current_bill_water_usage_to_date",
         device_class=SensorDeviceClass.WATER,
         native_unit_of_measurement=UnitOfVolume.GALLONS,
-        state_class=SensorStateClass.TOTAL,
+        # No state_class - prevents recorder from creating statistics
+        # Statistics are managed via external statistics only
         suggested_display_precision=1,
         value_fn=lambda data: data.get("current_bill_usage", 0),
     ),
@@ -82,17 +83,13 @@ class SFWaterSensor(CoordinatorEntity[SFWaterCoordinator], SensorEntity):
         # Generate unique_id that creates the proper entity_id
         account_number = coordinator.config_entry.data.get(CONF_USERNAME, "unknown")
         self._attr_unique_id = f"water_account_{account_number}_{description.key}"
-        # Mask account number for device info (show last 4 characters)
-        masked_account = (
-            f"****{account_number[-4:]}" if len(account_number) > 4 else account_number
-        )
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, config_entry.entry_id)},
             manufacturer="SFPUC",
             model="Water Usage",
             name="San Francisco Water Power Sewer",
-            sw_version=masked_account,
+            sw_version=__version__,
             configuration_url="https://myaccount-water.sfpuc.org",
         )
 

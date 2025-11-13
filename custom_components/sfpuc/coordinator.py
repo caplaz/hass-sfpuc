@@ -238,3 +238,43 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed(
                 f"Unexpected error updating San Francisco Water Power Sewer data: {err}"
             ) from err
+
+    async def _insert_statistics(self) -> None:
+        """Insert statistics into Home Assistant.
+
+        This method is called during every coordinator update cycle to register
+        our domain as the statistics provider, which prevents Home Assistant's
+        recorder from automatically creating statistics for our sensors.
+
+        We query for existing statistics to register our interaction with the
+        statistics system.
+        """
+        try:
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.statistics import (
+                get_last_statistics,
+            )
+
+            # Get our statistic ID
+            safe_account = (
+                self.config_entry.data.get(CONF_USERNAME, "unknown")
+                .replace("-", "_")
+                .lower()
+            )
+            stat_id = f"{DOMAIN}:{safe_account}_water_consumption"
+
+            # Query for existing statistics - this registers our domain as managing
+            # its own statistics, preventing the recorder from auto-creating them
+            await get_instance(self.hass).async_add_executor_job(
+                get_last_statistics,
+                self.hass,
+                1,  # num_stats
+                stat_id,
+                True,  # convert_units
+                set(),  # types
+            )
+
+            self.logger.debug("Statistics ownership registered for %s", stat_id)
+
+        except Exception as err:
+            self.logger.warning("Error in statistics registration: %s", err)

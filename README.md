@@ -32,12 +32,13 @@ SFPUC Portal → Integration → Home Assistant → Energy Dashboard
    - Maintains secure session for data access
    - Handles authentication errors gracefully
 
-2. **Historical Data Fetching** �
+2. **Historical Data Fetching** 📊
 
    - **Initial Setup**: Downloads 2 years of monthly data, 90 days of daily data, 30 days of hourly data
    - **Multiple Resolutions**: Fetches data at hourly, daily, and monthly intervals
    - **Backfilling**: Automatically fills missing data with 30-day lookback window
    - **Incremental Updates**: Adds new data points as they become available
+   - **Smart Optimization**: Skips historical fetch on subsequent restarts if data exists
 
 3. **Data Processing** ⚙️
 
@@ -48,8 +49,8 @@ SFPUC Portal → Integration → Home Assistant → Energy Dashboard
 4. **Statistics Insertion** 📈
 
    - Inserts usage data into Home Assistant's recorder database at multiple resolutions
-   - Creates separate statistics streams for hourly, daily, and monthly data
-   - Enables comprehensive historical analysis and Energy dashboard integration
+   - Creates consolidated statistics streams for comprehensive historical analysis
+   - Enables Energy dashboard integration with proper cumulative sum calculations
    - Supports long-term usage trends and comparative analysis
 
 5. **Sensor Updates** 🔄
@@ -71,7 +72,7 @@ This integration enables comprehensive water usage tracking in Home Assistant's 
 ### Update Cycle
 
 - **Frequency**: Fixed 12-hour intervals (appropriate for daily water usage data)
-- **Historical Fetching**: Comprehensive data download on first setup
+- **Historical Fetching**: Comprehensive data download on first setup only
 - **Backfilling**: 30-day lookback window for missing data (runs periodically)
 - **Pattern**: Follows Home Assistant utility integration best practices
 - **Trigger**: Time-based coordinator updates with intelligent backfilling
@@ -94,11 +95,17 @@ HACS (Home Assistant Community Store) is the easiest way to install and manage c
 
 1. **Open HACS**: Go to HACS in your Home Assistant sidebar
 2. **Navigate to Integrations**: Click on "Integrations"
-3. **Search and Install**:
+3. **Add Custom Repository**:
+   - Click the three dots menu (⋮) in the top right
+   - Select "Custom repositories"
+   - Add repository: `https://github.com/caplaz/hass-sfpuc`
+   - Category: `Integration`
+   - Click "Add"
+4. **Search and Install**:
    - Search for "San Francisco Water Power Sewer" in HACS
    - Click on it and select "Download"
    - Choose the latest version
-4. **Restart Home Assistant**: Required for the integration to load
+5. **Restart Home Assistant**: Required for the integration to load
 
 ### Method 2: Manual Installation
 
@@ -142,30 +149,29 @@ HACS (Home Assistant Community Store) is the easiest way to install and manage c
 
 ### Sensors Created
 
-The integration creates multiple sensors for different time resolutions:
+The integration creates a single primary sensor that displays current billing period water usage:
 
-- **San Francisco Water Power Sewer Daily Usage** (`sensor.sfpuc_daily_usage`)
+- **San Francisco Water Power Sewer** (`sensor.sfpuc_water_account_{account}_current_bill_water_usage_to_date`)
 
-  - **State**: Daily water usage in gallons
+  - **State**: Current billing period cumulative water usage in gallons (from last bill date to today)
   - **Device Class**: `water`
-  - **State Class**: `total_increasing`
+  - **State Class**: None (statistics-only approach)
   - **Unit**: `gal` (gallons)
   - **Update**: Every 12 hours
+  - **Statistics**: Links to underlying `sfpuc:{account}_water_consumption` statistics for historical data
 
-- **San Francisco Water Power Sewer Hourly Usage** (`sensor.sfpuc_hourly_usage`)
+### Historical Data Access
 
-  - **State**: Most recent hourly water usage in gallons
-  - **Device Class**: `water`
-  - **State Class**: `total_increasing`
-  - **Unit**: `gal` (gallons)
-  - **Update**: Every 12 hours
+Historical water usage data is stored in Home Assistant statistics, not in sensor state history:
 
-- **San Francisco Water Power Sewer Monthly Usage** (`sensor.sfpuc_monthly_usage`)
-  - **State**: Current month-to-date water usage in gallons
-  - **Device Class**: `water`
-  - **State Class**: `total_increasing`
-  - **Unit**: `gal` (gallons)
-  - **Update**: Every 12 hours
+- **Statistics ID**: `sfpuc:{account}_water_consumption`
+- **Data Resolutions**: Hourly, daily, and monthly statistics
+- **Time Range**: Up to 2+ years of historical data
+- **Access Methods**:
+  - Energy Dashboard (recommended)
+  - Developer Tools → Statistics
+  - Custom dashboard cards (ApexCharts, etc.)
+  - History graphs (statistics mode)
 
 ### Dashboard Integration
 
@@ -176,9 +182,9 @@ The integration enables water usage monitoring in the Energy dashboard:
 1. **Navigate to Energy Dashboard**: Settings → Dashboards → Energy
 2. **Add Water Consumption**:
    - Click "Add Consumption" (water usage is consumption)
-   - Select `sensor.sfpuc_daily_usage`
+   - Select `sensor.sfpuc_water_account_{account}_current_bill_water_usage_to_date`
    - Configure display preferences
-3. **View Historical Data**: The dashboard will show water usage trends over time
+3. **View Historical Data**: The dashboard will show water usage trends over time using underlying statistics
 4. **Statistics Integration**: Historical data is automatically stored for long-term analysis
 
 #### Add Sensor Card
@@ -186,17 +192,27 @@ The integration enables water usage monitoring in the Energy dashboard:
 For detailed monitoring, add a sensor card to your dashboard:
 
 1. **Add Card**: Dashboard → Add Card → Sensor
-2. **Select Sensor**: Choose `sensor.sfpuc_daily_usage`
+2. **Select Sensor**: Choose `sensor.sfpuc_water_account_{account}_current_bill_water_usage_to_date`
 3. **Customize**: Set display options, icons, and graph preferences
 4. **Historical View**: Enable graph to see usage patterns
+
+#### View Historical Statistics
+
+To view detailed historical data beyond the Energy Dashboard:
+
+1. **Developer Tools**: Go to Developer Tools → Statistics
+2. **Find Statistics**: Search for `sfpuc:{account}_water_consumption`
+3. **View Data**: Browse hourly, daily, and monthly usage statistics
+4. **Custom Cards**: Use statistics in custom dashboard cards for advanced visualizations
 
 ### Data Storage & Privacy
 
 - **Local Storage**: All data stored in Home Assistant's local database
+- **Statistics Storage**: Historical data stored in recorder statistics, not sensor state history
 - **No External Dependencies**: Data processing happens entirely locally
 - **Historical Preservation**: Full usage history maintained for analysis
 - **Secure Credentials**: SFPUC credentials encrypted and stored securely
-- **Statistics**: Data inserted into Home Assistant recorder for Energy dashboard
+- **Statistics Access**: Historical data available through Developer Tools → Statistics
 
 ## Troubleshooting
 
@@ -207,15 +223,25 @@ For detailed monitoring, add a sensor card to your dashboard:
 - **Cause**: Invalid username/password or SFPUC portal changes
 - **Solution**: Verify your SFPUC credentials and try reconfiguring the integration
 
-#### No Data Updates
+#### No Data in Energy Dashboard
 
-- **Cause**: SFPUC portal issues or network connectivity
-- **Solution**: Check SFPUC website manually and verify internet connection
+- **Cause**: Statistics sum values were missing (fixed in v1.0.0+)
+- **Solution**: Clear existing statistics and restart Home Assistant to re-insert data with proper sums
+
+#### No Historical Data Visible
+
+- **Cause**: Historical data is stored in statistics, not sensor history
+- **Solution**: Use Developer Tools → Statistics or Energy Dashboard to view historical data
 
 #### Sensor Unavailable
 
 - **Cause**: Integration unable to fetch data
 - **Solution**: Check Home Assistant logs for error messages
+
+#### Slow Startup
+
+- **Cause**: Historical data fetching on first setup
+- **Solution**: This is normal for the first run; subsequent restarts will be faster
 
 ### Debug Logging
 
@@ -231,13 +257,27 @@ logger:
 
 ### Architecture Overview
 
-The integration follows Home Assistant best practices with a modern architecture:
+The integration follows Home Assistant best practices with a modern statistics-first architecture:
 
-- **Coordinator Pattern**: Manages data fetching and updates
-- **Entity Descriptions**: Modern sensor implementation with descriptions
-- **Statistics Integration**: Inserts data into Home Assistant recorder
+- **Coordinator Pattern**: Manages data fetching and updates with dummy listener for reliability
+- **Statistics-First Approach**: Historical data stored in recorder statistics, sensor shows current billing period
+- **Single Sensor Entity**: One primary sensor per account displaying cumulative billing period usage
+- **Multi-Resolution Statistics**: Hourly, daily, and monthly data stored in consolidated statistics streams
+- **Smart Historical Fetching**: Downloads comprehensive data on first setup, skips on subsequent restarts
 - **Config Flow**: User-friendly setup and configuration
 - **Error Handling**: Graceful failure recovery and logging
+
+### Recent Improvements
+
+#### v1.0.0+ (Latest)
+
+- **✅ Single Sensor Architecture**: Consolidated to one primary sensor per account
+- **✅ Statistics Sum Fix**: Fixed cumulative sum calculations for proper Energy Dashboard display
+- **✅ Timezone Bug Fix**: Corrected timestamp handling for San Francisco local time
+- **✅ Startup Optimization**: Deferred historical data fetching to background, preventing slow startups
+- **✅ Smart Re-fetch Prevention**: Checks for existing data to avoid redundant downloads on restart
+- **✅ Monthly Historical Data**: Enabled billing cycle data for comprehensive historical analysis
+- **✅ Type Safety**: Fixed mypy type errors and improved code quality
 
 ### Requirements
 
@@ -257,6 +297,28 @@ The integration follows Home Assistant best practices with a modern architecture
 - Downloads Excel files containing usage data
 - Parses data locally without external API calls
 - Respects SFPUC's terms of service and rate limits
+
+## Changelog
+
+### v1.0.0+ (Latest)
+
+**Major Refactoring & Bug Fixes:**
+
+- **🏗️ Single Sensor Architecture**: Refactored to single primary sensor per account
+- **📊 Statistics Sum Fix**: Fixed critical bug where cumulative sum values were missing, preventing Energy Dashboard display
+- **🕐 Timezone Bug Fix**: Corrected timestamp handling for San Francisco local time (was 8 hours off)
+- **⚡ Startup Optimization**: Deferred historical data fetching to background, preventing slow Home Assistant startups
+- **🧠 Smart Re-fetch Prevention**: Added logic to check for existing data and skip redundant downloads on restart
+- **📅 Monthly Historical Data**: Enabled billing cycle data for comprehensive historical analysis
+- **🔧 Type Safety**: Fixed mypy type errors and improved code quality
+- **🧹 Code Cleanup**: Removed unused wrapper methods and consolidated scraper functionality
+
+**Technical Improvements:**
+
+- Statistics-first approach with proper cumulative sum calculations
+- Consolidated statistics streams for all resolutions
+- Improved error handling and logging
+- Better separation of concerns between coordinator and data fetching
 
 ## Contributing
 
@@ -295,10 +357,23 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Credits
 
 - **Author**: caplaz
-- **Inspired by**: Other utility monitoring integrations
+- **Inspired by**: Home Assistant utility integration best practices
 - **SFPUC**: San Francisco Public Utilities Commission for providing water service data
 
 ---
+
+<!-- Badges -->
+
+[hacs]: https://github.com/hacs/integration
+[hacsbadge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/caplaz/hass-sfpuc.svg?style=for-the-badge
+[releases]: https://github.com/caplaz/hass-sfpuc/releases
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/caplaz/hass-sfpuc/ci.yml?style=for-the-badge
+[ci]: https://github.com/caplaz/hass-sfpuc/actions/workflows/ci.yml
+[commits-shield]: https://img.shields.io/github/commit-activity/m/caplaz/hass-sfpuc?style=for-the-badge
+[commits]: https://github.com/caplaz/hass-sfpuc/commits/main
+[license-shield]: https://img.shields.io/github/license/caplaz/hass-sfpuc.svg?style=for-the-badge
+[logo]: https://raw.githubusercontent.com/caplaz/hass-sfpuc/main/images/logo.png
 
 ## ⚠️ Important Disclaimer
 
