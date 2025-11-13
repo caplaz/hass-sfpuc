@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType
@@ -53,7 +53,9 @@ class TestSFWaterSensor:
 
         assert sensor.device_class == SensorDeviceClass.WATER
         assert sensor.native_unit_of_measurement == UnitOfVolume.GALLONS
-        assert sensor.state_class == SensorStateClass.TOTAL
+        assert (
+            sensor.state_class is None
+        )  # No state_class to prevent duplicate statistics
         assert sensor.suggested_display_precision == 1
 
     def test_hourly_usage_sensor_properties(self):

@@ -1,7 +1,7 @@
 """Tests for San Francisco Water Power Sewer coordinator."""
 
 from datetime import timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
@@ -152,3 +152,51 @@ class TestSFWaterCoordinator:
 
         assert result["current_bill_usage"] == 0.0
         assert "last_updated" in result
+
+    @patch("custom_components.sfpuc.coordinator.SFPUCScraper")
+    @pytest.mark.asyncio
+    async def test_insert_statistics_success(
+        self, mock_scraper_class, hass, config_entry
+    ):
+        """Test statistics registration during update cycle."""
+        mock_scraper = Mock()
+        mock_scraper_class.return_value = mock_scraper
+
+        coordinator = SFWaterCoordinator(hass, config_entry)
+
+        with patch(
+            "homeassistant.components.recorder.get_instance"
+        ) as mock_get_instance:
+            mock_recorder = Mock()
+            mock_recorder.async_add_executor_job = AsyncMock(return_value=[])
+            mock_get_instance.return_value = mock_recorder
+
+            await coordinator._insert_statistics()
+
+            # Verify recorder was called to register statistics ownership
+            mock_recorder.async_add_executor_job.assert_called_once()
+            call_args = mock_recorder.async_add_executor_job.call_args
+            assert call_args is not None
+            assert "water_consumption" in str(call_args)
+
+    @patch("custom_components.sfpuc.coordinator.SFPUCScraper")
+    @pytest.mark.asyncio
+    async def test_insert_statistics_failure_handling(
+        self, mock_scraper_class, hass, config_entry
+    ):
+        """Test graceful handling of statistics registration errors."""
+        mock_scraper = Mock()
+        mock_scraper_class.return_value = mock_scraper
+
+        coordinator = SFWaterCoordinator(hass, config_entry)
+
+        with patch(
+            "homeassistant.components.recorder.get_instance"
+        ) as mock_get_instance:
+            mock_get_instance.side_effect = Exception("Recorder error")
+
+            # Should not raise exception, just log warning
+            await coordinator._insert_statistics()
+
+            # Coordinator should still be functional
+            assert coordinator is not None
