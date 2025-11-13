@@ -10,6 +10,20 @@ A Home Assistant custom integration for monitoring San Francisco water usage fro
 
 ![San Francisco Water Power Sewer][logo]
 
+## ⚠️ Important Disclaimer
+
+**This project is not affiliated with or endorsed by the San Francisco Public Utilities Commission (SFPUC) or https://www.sfpuc.gov.**
+
+This is an unofficial, community-maintained integration that scrapes data from the SFPUC website. As such:
+
+- **It can break at any time** due to changes in SFPUC's website structure, authentication methods, or data formats
+- **Use at your own risk** - the integration may stop working without notice
+- **No guarantees** of functionality, accuracy, or continued operation
+- **Not responsible for any issues** that may arise from using this integration
+- **Please use responsibly** and in accordance with SFPUC's terms of service
+
+If the integration stops working, please check the [GitHub Issues](https://github.com/caplaz/hass-sfpuc/issues) for updates or create a new issue.
+
 ## How It Works
 
 ### Data Flow Overview
@@ -348,11 +362,9 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Changelog
 
-- **Issues**: [GitHub Issues](https://github.com/caplaz/hass-sfpuc/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/caplaz/hass-sfpuc/discussions)
-- **Documentation**: [Full Documentation](https://github.com/caplaz/hass-sfpuc/wiki)
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.
 
 ---
 
@@ -367,18 +379,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 [commits-shield]: https://img.shields.io/github/commit-activity/m/caplaz/hass-sfpuc?style=for-the-badge
 [commits]: https://github.com/caplaz/hass-sfpuc/commits/main
 [license-shield]: https://img.shields.io/github/license/caplaz/hass-sfpuc.svg?style=for-the-badge
-[logo]: https://raw.githubusercontent.com/caplaz/hass-sfpuc/main/images/logo.png
-
-## ⚠️ Important Disclaimer
-
-**This project is not affiliated with or endorsed by the San Francisco Public Utilities Commission (SFPUC) or https://www.sfpuc.gov.**
-
-This is an unofficial, community-maintained integration that scrapes data from the SFPUC website. As such:
-
-- **It can break at any time** due to changes in SFPUC's website structure, authentication methods, or data formats
-- **Use at your own risk** - the integration may stop working without notice
-- **No guarantees** of functionality, accuracy, or continued operation
-- **Not responsible for any issues** that may arise from using this integration
-- **Please use responsibly** and in accordance with SFPUC's terms of service
-
-If the integration stops working, please check the [GitHub Issues](https://github.com/caplaz/hass-sfpuc/issues) for updates or create a new issue.
+[logo]: https://www.sfpuc.gov/themes/custom/sfwater/img/scm_logo.svg
