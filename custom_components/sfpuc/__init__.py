@@ -20,11 +20,19 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
+import voluptuous as vol
 
+from .const import DOMAIN
 from .coordinator import SFWaterCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = vol.Schema(
+    {vol.Optional(DOMAIN): cv.config_entry_only_config_schema(DOMAIN)},
+    extra=vol.ALLOW_EXTRA,
+)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
