@@ -35,6 +35,12 @@ class TestDataFetcher:
         if DATA_INSTANCE not in hass.data:
             hass.data[DATA_INSTANCE] = Mock()
 
+    @pytest.fixture(autouse=True)
+    def mock_coordinator_timer(self):
+        """Mock coordinator timer to prevent lingering timers."""
+        with patch("asyncio.AbstractEventLoop.call_later", return_value=None):
+            yield
+
     @patch("custom_components.sfpuc.coordinator.SFPUCScraper")
     @pytest.mark.asyncio
     async def test_fetch_historical_data_success(

@@ -354,12 +354,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Discussions**: [GitHub Discussions](https://github.com/caplaz/hass-sfpuc/discussions)
 - **Documentation**: [Full Documentation](https://github.com/caplaz/hass-sfpuc/wiki)
 
-## Credits
-
-- **Author**: caplaz
-- **Inspired by**: Home Assistant utility integration best practices
-- **SFPUC**: San Francisco Public Utilities Commission for providing water service data
-
 ---
 
 <!-- Badges -->

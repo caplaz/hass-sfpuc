@@ -29,6 +29,25 @@ class TestStatisticsHandler:
         if DATA_INSTANCE not in hass.data:
             hass.data[DATA_INSTANCE] = Mock()
 
+    @pytest.fixture(autouse=True)
+    def mock_coordinator_timer(self):
+        """Mock coordinator timer to prevent lingering timers."""
+        with patch("asyncio.AbstractEventLoop.call_later", return_value=None):
+            yield
+
+    def teardown_method(self):
+        """Clean up after each test method."""
+        # Clean up any lingering coordinators
+        if hasattr(self, "coordinator"):
+            # Stop the coordinator's refresh timer
+            if (
+                hasattr(self.coordinator, "_refresh_timer")
+                and self.coordinator._refresh_timer
+            ):
+                self.coordinator._refresh_timer.cancel()
+            if hasattr(self.coordinator, "_unsub_refresh"):
+                self.coordinator._unsub_refresh()
+
     @pytest.mark.asyncio
     async def test_insert_statistics_hourly_data(self, hass, config_entry):
         """Test inserting statistics for hourly data."""
@@ -78,10 +97,8 @@ class TestStatisticsHandler:
 
         # Verify metadata contains required fields
         metadata = call_args[0][1]
+        assert metadata["unit_class"] == "volume"
         assert metadata["unit_of_measurement"] == "gal"
-        # unit_class may not be present in older HA versions
-        if "unit_class" in metadata:
-            assert metadata["unit_class"] == "volume"
 
     @pytest.mark.asyncio
     async def test_insert_statistics_monthly_data(self, hass, config_entry):
