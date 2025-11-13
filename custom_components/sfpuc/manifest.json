@@ -3,7 +3,7 @@
   "name": "San Francisco Water Power Sewer",
   "codeowners": ["@caplaz"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["recorder"],
   "documentation": "https://github.com/caplaz/hass-sfpuc",
   "integration_type": "device",
   "iot_class": "cloud_polling",
@@ -15,6 +15,5 @@
     "beautifulsoup4>=4.9.3",
     "voluptuous>=0.13.1"
   ],
-  "supported_locales": ["en", "es"],
   "version": "1.0.0"
 }
