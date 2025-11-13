@@ -76,6 +76,11 @@ class TestStatisticsHandler:
         call_args = mock_add_stats.call_args
         assert len(call_args[0]) == 3  # hass, metadata, statistics
 
+        # Verify metadata contains required fields
+        metadata = call_args[0][1]
+        assert metadata["unit_class"] == "volume"
+        assert metadata["unit_of_measurement"] == "gal"
+
     @pytest.mark.asyncio
     async def test_insert_statistics_monthly_data(self, hass, config_entry):
         """Test inserting statistics for monthly data."""
