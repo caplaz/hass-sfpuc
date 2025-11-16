@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.1 (2025-11-16)
+
+### Enhancements
+
+- Add comprehensive translation strings for repair flow dialog
+- Improve repair framework with proper form step indicators
+
+### Improvements
+
+- Add translation strings for repair flow (English and Spanish)
+- Include field labels and descriptions for username/password inputs in repair flow
+- Add last_step indicator to repair form for proper step completion
+
+### Testing
+
+- Add comprehensive tests for repair issue creation on authentication failure
+- Add tests for automatic issue cleanup on successful login
+- Verify issue_id and is_fixable parameters are set correctly
+- Enhanced coordinator test coverage for repair workflow
+
 ## 1.0.0 (2025-11-13)
 
 ### Features
