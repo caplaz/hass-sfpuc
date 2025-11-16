@@ -88,6 +88,9 @@ class TestSFWaterCoordinator:
                 "custom_components.sfpuc.coordinator.async_detect_billing_day",
                 AsyncMock(),
             ),
+            patch(
+                "homeassistant.helpers.issue_registry.async_delete_issue"
+            ) as mock_delete_issue,
         ):
             mock_recorder = Mock()
             mock_recorder.async_add_executor_job = AsyncMock(
@@ -101,6 +104,12 @@ class TestSFWaterCoordinator:
         assert (
             coordinator._historical_data_fetched is False
         )  # Background task scheduled, not completed
+
+        # Verify repair issue was deleted on successful login
+        mock_delete_issue.assert_called_once()
+        delete_call_args = mock_delete_issue.call_args
+        assert delete_call_args[0][1] == "sfpuc"  # Domain
+        assert delete_call_args[0][2] == "invalid_credentials"  # Issue ID
 
         # No direct calls to get_usage_data in _async_update_data (backfill mocked)
         assert mock_scraper.get_usage_data.call_count == 0
@@ -117,8 +126,19 @@ class TestSFWaterCoordinator:
 
         coordinator = SFWaterCoordinator(hass, config_entry)
 
-        with pytest.raises(UpdateFailed, match="Failed to login to SF PUC"):
-            await coordinator._async_update_data()
+        with patch(
+            "homeassistant.helpers.issue_registry.async_create_issue"
+        ) as mock_create_issue:
+            with pytest.raises(UpdateFailed, match="Failed to login to SF PUC"):
+                await coordinator._async_update_data()
+
+            # Verify issue was created
+            mock_create_issue.assert_called_once()
+            # Check positional args: hass, domain, issue_id
+            call_args = mock_create_issue.call_args
+            assert call_args[0][1] == "sfpuc"  # Domain
+            assert call_args[0][2] == "invalid_credentials"  # Issue ID
+            assert call_args.kwargs["is_fixable"] is True
 
     @patch("custom_components.sfpuc.coordinator.SFPUCScraper")
     @pytest.mark.asyncio

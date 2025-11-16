@@ -136,6 +136,11 @@ class SFWaterCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "Failed to login to SF PUC - credentials may be invalid"
                 )
 
+            # Login successful - delete any existing invalid_credentials issue
+            from homeassistant.helpers.issue_registry import async_delete_issue
+
+            async_delete_issue(self.hass, DOMAIN, "invalid_credentials")
+
             self.logger.debug("Login successful, proceeding with data fetch")
 
             # Check if we need to fetch historical data
