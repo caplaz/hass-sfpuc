@@ -75,7 +75,7 @@ class SFWaterCredentialsRepair(RepairsFlow):
             return self.async_abort(reason="credential_updated")
 
         return self.async_show_form(
-            step_id="confirm",
+            step_id="repair_confirm",
             data_schema=vol.Schema(
                 {
                     vol.Required("username"): str,  # type: ignore[dict-item]
@@ -86,6 +86,4 @@ class SFWaterCredentialsRepair(RepairsFlow):
                 "account": self.context.get("account", "unknown"),  # type: ignore[dict-item]
             },
             last_step=True,
-            title="Update SFPUC Credentials",
-            description="Please enter your updated SFPUC credentials for account {account}. Your credentials are stored locally in Home Assistant and never shared.",
         )

@@ -12,6 +12,18 @@
           "username": "Your SFPUC account username or account number used to login to the water portal.",
           "password": "Your SFPUC account password for accessing usage data."
         }
+      },
+      "repair_confirm": {
+        "title": "Update SFPUC Credentials",
+        "description": "Please enter your updated SFPUC credentials for account \"{account}\". Your credentials are stored locally in Home Assistant and never shared.",
+        "data": {
+          "username": "SFPUC Username",
+          "password": "SFPUC Password"
+        },
+        "data_description": {
+          "username": "Your SFPUC account username or account number",
+          "password": "Your SFPUC account password"
+        }
       }
     },
     "error": {

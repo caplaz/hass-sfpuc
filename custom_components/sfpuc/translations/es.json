@@ -12,6 +12,18 @@
           "username": "Tu nombre de usuario de cuenta SFPUC o número de cuenta utilizado para iniciar sesión en el portal de agua.",
           "password": "Tu contraseña de cuenta SFPUC para acceder a los datos de uso."
         }
+      },
+      "repair_confirm": {
+        "title": "Actualizar Credenciales SFPUC",
+        "description": "Ingresa tus credenciales SFPUC actualizadas para la cuenta \"{account}\". Tus credenciales se almacenan localmente en Home Assistant y nunca se comparten.",
+        "data": {
+          "username": "Nombre de Usuario SFPUC",
+          "password": "Contraseña SFPUC"
+        },
+        "data_description": {
+          "username": "Tu nombre de usuario de cuenta SFPUC o número de cuenta",
+          "password": "Tu contraseña de cuenta SFPUC"
+        }
       }
     },
     "error": {
