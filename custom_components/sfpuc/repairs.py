@@ -86,4 +86,6 @@ class SFWaterCredentialsRepair(RepairsFlow):
                 "account": self.context.get("account", "unknown"),  # type: ignore[dict-item]
             },
             last_step=True,
+            title="Update SFPUC Credentials",
+            description="Please enter your updated SFPUC credentials for account {account}. Your credentials are stored locally in Home Assistant and never shared.",
         )
