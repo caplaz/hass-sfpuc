@@ -42,9 +42,9 @@ class SFWaterCredentialsRepair(RepairsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the first step of the repair flow."""
-        return await self.async_step_confirm()
+        return await self.async_step_confirm_repair()
 
-    async def async_step_confirm(
+    async def async_step_confirm_repair(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the confirm step of the repair flow."""
@@ -75,7 +75,7 @@ class SFWaterCredentialsRepair(RepairsFlow):
             return self.async_abort(reason="credential_updated")
 
         return self.async_show_form(
-            step_id="repair_confirm",
+            step_id="confirm_repair",
             data_schema=vol.Schema(
                 {
                     vol.Required("username"): str,  # type: ignore[dict-item]
@@ -85,5 +85,4 @@ class SFWaterCredentialsRepair(RepairsFlow):
             description_placeholders={
                 "account": self.context.get("account", "unknown"),  # type: ignore[dict-item]
             },
-            last_step=True,
         )

@@ -23,7 +23,7 @@ class TestRepairs:
 
         result = await flow.async_step_init()
         assert result["type"] == "form"
-        assert result["step_id"] == "repair_confirm"
+        assert result["step_id"] == "confirm_repair"
 
     async def test_credentials_repair_confirm_step(self, hass, config_entry):
         """Test the repair flow confirm step without input."""
@@ -31,9 +31,9 @@ class TestRepairs:
         flow.hass = hass
         flow.context = {"entry_id": config_entry.entry_id, "account": "testuser"}  # type: ignore[assignment,typeddict-unknown-key]
 
-        result = await flow.async_step_confirm()
+        result = await flow.async_step_confirm_repair()
         assert result["type"] == "form"
-        assert result["step_id"] == "repair_confirm"
+        assert result["step_id"] == "confirm_repair"
         assert "data_schema" in result
 
     async def test_credentials_repair_updates_entry(self, hass, config_entry):
@@ -52,7 +52,7 @@ class TestRepairs:
                 with patch.object(
                     hass.config_entries, "async_reload", new_callable=AsyncMock
                 ):
-                    result = await flow.async_step_confirm(user_input)
+                    result = await flow.async_step_confirm_repair(user_input)
 
         assert result["type"] == "abort"
         assert result["reason"] == "credential_updated"
