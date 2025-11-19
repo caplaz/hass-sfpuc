@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3 (2025-11-19)
+
+### Bug Fixes
+
+- Add country restriction to US in hacs.json
+- Remove invalid filename field from hacs.json
+
 ## 1.0.2 (2025-11-18)
 
 ### Bug Fixes
