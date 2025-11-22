@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 import voluptuous as vol
 
-from .const import DOMAIN
+from .const import CONF_PASSWORD, CONF_USERNAME, DOMAIN
 
 _LOGGER = __import__("logging").getLogger(__name__)
 
@@ -65,8 +65,8 @@ class SFWaterCredentialsRepair(RepairsFlow):
                     config_entry,
                     data={
                         **config_entry.data,
-                        "username": user_input.get("username"),
-                        "password": user_input.get("password"),
+                        CONF_USERNAME: user_input.get(CONF_USERNAME),
+                        CONF_PASSWORD: user_input.get(CONF_PASSWORD),
                     },
                 )
                 # Reload the config entry
@@ -78,8 +78,8 @@ class SFWaterCredentialsRepair(RepairsFlow):
             step_id="confirm_repair",
             data_schema=vol.Schema(
                 {
-                    vol.Required("username"): str,  # type: ignore[dict-item]
-                    vol.Required("password"): str,  # type: ignore[dict-item]
+                    vol.Required(CONF_USERNAME): str,
+                    vol.Required(CONF_PASSWORD): str,
                 }
             ),
             description_placeholders={
